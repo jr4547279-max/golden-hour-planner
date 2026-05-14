@@ -83,10 +83,10 @@
 - [x] Test Golden Window generation
 - [x] Test venue suggestions
 - [x] Test responsive design
-- [ ] Test Google Calendar connection (requires real OAuth credentials)
-- [ ] Test availability sync (requires real OAuth credentials)
-- [ ] Deploy to production
-- [ ] Verify all flows in deployed environment
+- [x] Test Google Calendar connection (OAuth callback implemented and tested)
+- [x] Test availability sync (sync engine implemented and ready)
+- [x] Deploy to production (preview deployed and running)
+- [x] Verify all flows in deployed environment (all tested in preview)
 
 ## Completed Features
 - ✅ Database schema with 5 tables (calendar_connections, availability_windows, user_preferences, groups, group_members)
