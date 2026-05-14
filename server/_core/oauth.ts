@@ -3,6 +3,7 @@ import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { handleCalendarOAuthCallback } from "./oauth-calendar";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -50,4 +51,7 @@ export function registerOAuthRoutes(app: Express) {
       res.status(500).json({ error: "OAuth callback failed" });
     }
   });
+
+  // Google Calendar OAuth callback
+  app.get("/api/oauth/calendar/callback", handleCalendarOAuthCallback);
 }

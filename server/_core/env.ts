@@ -7,4 +7,8 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  googleClientId: process.env.VITE_GOOGLE_CLIENT_ID ?? "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  googlePlacesKey: process.env.VITE_GOOGLE_PLACES_KEY ?? "",
+  appUrl: process.env.VITE_APP_URL ?? "http://localhost:3000",
 };
