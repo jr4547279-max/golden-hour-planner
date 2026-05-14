@@ -4,3 +4,6 @@ entrypoint = "server/_core/index.ts"
 [deployment]
 run = ["pnpm", "start"]
 build = ["pnpm", "build"]
+
+[agent]
+expertMode = true
