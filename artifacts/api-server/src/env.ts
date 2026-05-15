@@ -14,7 +14,7 @@ export const ENV = {
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   googlePlacesKey: process.env.VITE_GOOGLE_PLACES_KEY ?? "",
   appUrl: process.env.VITE_APP_URL ?? "http://localhost:3000",
-  supabaseUrl: process.env.SUPABASE_URL ?? "",
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
+  supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "",
+  supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "",
   supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET ?? "",
 };
