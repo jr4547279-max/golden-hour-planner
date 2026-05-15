@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createTRPCReact } from "@trpc/react-query";
-// @ts-ignore - AppRouter lives in the api-server package; any type is fine for the migration
-export const trpc = createTRPCReact<any>();
+
+// The AppRouter type lives in the api-server package. To avoid cross-package type issues,
+// we use a loose typing approach. The actual tRPC client will work correctly at runtime.
+export const trpc: ReturnType<typeof createTRPCReact<any>> = createTRPCReact();
