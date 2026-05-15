@@ -180,11 +180,25 @@
   
   /* Nexus Glass Card */
   .nexus-glass {
-    @apply bg-[#111827]/80 backdrop-blur-xl border border-[#d4a853]/10 rounded-2xl;
+    background-color: rgba(17, 24, 39, 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(212, 168, 83, 0.1);
+    border-radius: 1rem;
   }
   
   .nexus-glass-hover {
-    @apply nexus-glass transition-all duration-300 hover:border-[#d4a853]/25 hover:shadow-[0_0_30px_rgba(212,168,83,0.08)];
+    background-color: rgba(17, 24, 39, 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(212, 168, 83, 0.1);
+    border-radius: 1rem;
+    transition: all 0.3s ease;
+  }
+  
+  .nexus-glass-hover:hover {
+    border-color: rgba(212, 168, 83, 0.25);
+    box-shadow: 0 0 30px rgba(212, 168, 83, 0.08);
   }
   
   /* Golden Glow Effect */
@@ -237,20 +251,37 @@
   
   /* Orbital Lines */
   .orbital-line {
-    @apply absolute rounded-full border border-[#d4a853]/10;
+    position: absolute;
+    border-radius: 9999px;
+    border: 1px solid rgba(212, 168, 83, 0.1);
   }
   
   /* Bottom Navigation */
   .bottom-nav {
-    @apply fixed bottom-0 left-0 right-0 bg-[#0d1424]/95 backdrop-blur-xl border-t border-[#d4a853]/10 pb-safe;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(13, 20, 36, 0.95);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(212, 168, 83, 0.1);
+    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
   }
   
   .bottom-nav-item {
-    @apply flex flex-col items-center justify-center gap-1 py-2 px-4 text-muted-foreground transition-colors;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.5rem 1rem;
+    color: #94a3b8;
+    transition: color 0.2s ease;
   }
   
   .bottom-nav-item.active {
-    @apply text-[#d4a853];
+    color: #d4a853;
   }
   
   /* Custom Scrollbar */

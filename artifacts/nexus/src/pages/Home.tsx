@@ -1,5 +1,5 @@
 import { useAuthContext } from "@/contexts/AuthContext";
-import { trpc } from "@/lib/trpc";
+import { isDemoMode } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { 
   Bell, ChevronRight, Plus, Calendar, CheckCircle2, 
