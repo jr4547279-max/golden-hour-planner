@@ -7,6 +7,7 @@ import * as db from "./db";
 import bcrypt from "bcryptjs";
 import { sdk } from "./sdk";
 import { ENV } from "./env";
+import { calculateGoldenWindows } from "./goldenWindow";
 
 const publicUser = <T extends { password?: string | null }>(user: T) => {
   const { password: _password, ...safeUser } = user;
@@ -27,6 +28,11 @@ function ensureAuthConfig() {
   }
 }
 
+function safeParseJSON(val: string | null | undefined): string[] {
+  if (!val) return [];
+  try { return JSON.parse(val) as string[]; } catch { return []; }
+}
+
 const circleTypeSchema = z.enum(["friends", "family", "work", "date_night", "other"]);
 
 export const appRouter = router({
@@ -43,13 +49,11 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         ensureAuthConfig();
-
         const email = normalizeEmail(input.email);
         const existing = await db.getUserByEmail(email);
         if (existing) {
           throw new TRPCError({ code: "CONFLICT", message: "A user with this email already exists" });
         }
-
         const hashedPassword = await bcrypt.hash(input.password, 12);
         const user = await db.createUser({
           email,
@@ -58,10 +62,8 @@ export const appRouter = router({
           loginMethod: "email",
           openId: `email_${crypto.randomUUID()}`,
         });
-
         const sessionToken = await sdk.createSessionToken(user.openId!, { name: user.name || "" });
         ctx.res.cookie(COOKIE_NAME, sessionToken, getSessionCookieOptions(ctx.req));
-
         return { success: true, user: publicUser(user) };
       }),
 
@@ -74,20 +76,16 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         ensureAuthConfig();
-
         const user = await db.getUserByEmail(normalizeEmail(input.email));
         if (!user || !user.password) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
         }
-
         const valid = await bcrypt.compare(input.password, user.password);
         if (!valid) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
         }
-
         const sessionToken = await sdk.createSessionToken(user.openId!, { name: user.name || "" });
         ctx.res.cookie(COOKIE_NAME, sessionToken, getSessionCookieOptions(ctx.req));
-
         return { success: true, user: publicUser(user) };
       }),
 
@@ -99,18 +97,15 @@ export const appRouter = router({
 
   circles: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      const circles = await db.getCirclesByUser(ctx.user.id);
-      return circles;
+      return db.getCirclesByUser(ctx.user.id);
     }),
 
     create: protectedProcedure
-      .input(
-        z.object({
-          name: z.string().trim().min(1, "Circle name is required").max(100),
-          description: z.string().trim().max(500).optional(),
-          type: circleTypeSchema,
-        })
-      )
+      .input(z.object({
+        name: z.string().trim().min(1).max(100),
+        description: z.string().trim().max(500).optional(),
+        type: circleTypeSchema,
+      }))
       .mutation(async ({ input, ctx }) => {
         const circle = await db.createCircle(ctx.user.id, {
           name: input.name,
@@ -124,22 +119,15 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .query(async ({ input, ctx }) => {
         const circle = await db.getCircleById(input.id);
-        if (!circle) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Circle not found" });
-        }
-
+        if (!circle) throw new TRPCError({ code: "NOT_FOUND", message: "Circle not found" });
         const isMember = await db.isCircleMember(input.id, ctx.user.id);
-        if (!isMember) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
-        }
-
+        if (!isMember) throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
         const [memberCount, pendingInvites, creator, inviteToken] = await Promise.all([
           db.getCircleMemberCount(input.id),
           db.getCirclePendingInviteCount(input.id),
           db.getCircleCreator(input.id),
           db.ensureInviteToken(input.id),
         ]);
-
         return {
           ...circle,
           inviteToken,
@@ -153,9 +141,7 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .query(async ({ input, ctx }) => {
         const isMember = await db.isCircleMember(input.id, ctx.user.id);
-        if (!isMember) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
-        }
+        if (!isMember) throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
         return db.getCircleMembers(input.id);
       }),
 
@@ -163,9 +149,7 @@ export const appRouter = router({
       .input(z.object({ token: z.string() }))
       .query(async ({ input }) => {
         const circle = await db.getCircleByInviteToken(input.token);
-        if (!circle) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired invite link" });
-        }
+        if (!circle) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired invite link" });
         const [memberCount, creator] = await Promise.all([
           db.getCircleMemberCount(circle.id),
           db.getCircleCreator(circle.id),
@@ -184,9 +168,7 @@ export const appRouter = router({
       .input(z.object({ token: z.string() }))
       .mutation(async ({ input, ctx }) => {
         const circle = await db.getCircleByInviteToken(input.token);
-        if (!circle) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired invite link" });
-        }
+        if (!circle) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired invite link" });
         const { alreadyMember } = await db.joinCircle(circle.id, ctx.user.id);
         return { success: true, circleId: circle.id, alreadyMember };
       }),
@@ -195,12 +177,8 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input, ctx }) => {
         const circle = await db.getCircleById(input.id);
-        if (!circle) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Circle not found" });
-        }
-        if (circle.createdBy !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only the circle creator can regenerate the invite link" });
-        }
+        if (!circle) throw new TRPCError({ code: "NOT_FOUND", message: "Circle not found" });
+        if (circle.createdBy !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Only the circle creator can regenerate the invite link" });
         const token = await db.regenerateInviteToken(input.id);
         return { success: true, inviteToken: token };
       }),
@@ -209,30 +187,22 @@ export const appRouter = router({
       .input(z.object({ id: z.string() }))
       .query(async ({ input, ctx }) => {
         const isMember = await db.isCircleMember(input.id, ctx.user.id);
-        if (!isMember) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
-        }
+        if (!isMember) throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
         return db.getCirclePreferences(input.id);
       }),
 
     updatePreferences: protectedProcedure
-      .input(
-        z.object({
-          id: z.string(),
-          preferredArea: z.string().max(200).optional(),
-          budgetRange: z.enum(["£", "££", "£££"]).optional(),
-          defaultVibe: z.array(z.string()).optional(),
-          defaultVenueType: z.array(z.string()).optional(),
-        })
-      )
+      .input(z.object({
+        id: z.string(),
+        preferredArea: z.string().max(200).optional(),
+        budgetRange: z.enum(["£", "££", "£££"]).optional(),
+        defaultVibe: z.array(z.string()).optional(),
+        defaultVenueType: z.array(z.string()).optional(),
+      }))
       .mutation(async ({ input, ctx }) => {
         const circle = await db.getCircleById(input.id);
-        if (!circle) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Circle not found" });
-        }
-        if (circle.createdBy !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only the circle admin can update circle preferences" });
-        }
+        if (!circle) throw new TRPCError({ code: "NOT_FOUND", message: "Circle not found" });
+        if (circle.createdBy !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Only the circle admin can update circle preferences" });
         await db.upsertCirclePreferences(input.id, {
           preferredArea: input.preferredArea,
           budgetRange: input.budgetRange,
@@ -240,6 +210,89 @@ export const appRouter = router({
           defaultVenueType: input.defaultVenueType ? JSON.stringify(input.defaultVenueType) : undefined,
         });
         return { success: true };
+      }),
+  }),
+
+  availability: router({
+    save: protectedProcedure
+      .input(z.object({
+        circleId: z.string(),
+        availableDays: z.array(z.string()),
+        preferredTimes: z.array(z.string()),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const isMember = await db.isCircleMember(input.circleId, ctx.user.id);
+        if (!isMember) throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
+        await db.upsertUserAvailability(ctx.user.id, input.circleId, {
+          availableDays: input.availableDays,
+          preferredTimes: input.preferredTimes,
+        });
+        return { success: true };
+      }),
+
+    getMine: protectedProcedure
+      .input(z.object({ circleId: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const row = await db.getUserAvailability(ctx.user.id, input.circleId);
+        if (!row) return { availableDays: [], preferredTimes: [] };
+        return {
+          availableDays: safeParseJSON(row.availableDays),
+          preferredTimes: safeParseJSON(row.preferredTimes),
+        };
+      }),
+
+    getForCircle: protectedProcedure
+      .input(z.object({ circleId: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const isMember = await db.isCircleMember(input.circleId, ctx.user.id);
+        if (!isMember) throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
+        const rows = await db.getCircleAvailability(input.circleId);
+        return rows.map((r) => ({
+          userId: r.userId,
+          name: r.name,
+          email: r.email,
+          availableDays: safeParseJSON(r.availableDays),
+          preferredTimes: safeParseJSON(r.preferredTimes),
+        }));
+      }),
+  }),
+
+  goldenWindow: router({
+    calculate: protectedProcedure
+      .input(z.object({ circleId: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const isMember = await db.isCircleMember(input.circleId, ctx.user.id);
+        if (!isMember) throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
+
+        const [memberAvailRows, memberIds, circlePrefs] = await Promise.all([
+          db.getCircleAvailability(input.circleId),
+          db.getCircleMemberUserIds(input.circleId),
+          db.getCirclePreferences(input.circleId),
+        ]);
+
+        const prefRows = await db.getUserPreferencesForUsers(memberIds);
+
+        const memberAvailability = memberAvailRows.map((r) => ({
+          userId: r.userId,
+          name: r.name,
+          email: r.email,
+          availableDays: safeParseJSON(r.availableDays),
+          preferredTimes: safeParseJSON(r.preferredTimes),
+        }));
+
+        const memberPrefs = prefRows.map((p) => ({
+          userId: p.userId,
+          vibes: safeParseJSON(p.vibes),
+          budgetTier: p.budgetTier ?? null,
+          indoorOutdoor: p.indoorOutdoor ?? null,
+          foodPreferences: safeParseJSON(p.foodPreferences),
+        }));
+
+        const results = calculateGoldenWindows(memberAvailability, memberPrefs, circlePrefs);
+        const totalMembers = memberIds.length;
+        const submittedCount = memberAvailRows.length;
+
+        return { results, totalMembers, submittedCount };
       }),
   }),
 
@@ -256,14 +309,10 @@ export const appRouter = router({
 
     getAuthUrl: protectedProcedure.query(({ ctx }) => {
       const clientId = ENV.googleClientId;
-      if (!clientId) {
-        return { authUrl: null, configured: false } as const;
-      }
-
+      if (!clientId) return { authUrl: null, configured: false } as const;
       const host = ctx.req.headers.host ?? "";
       const origin = (ctx.req.headers.origin as string | undefined) ?? `https://${host}`;
       const redirectUri = `${origin}/api/oauth/calendar/callback`;
-
       const state = Buffer.from(JSON.stringify({ userId: ctx.user.id })).toString("base64");
       const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       url.searchParams.set("client_id", clientId);
@@ -277,7 +326,6 @@ export const appRouter = router({
       url.searchParams.set("state", state);
       url.searchParams.set("access_type", "offline");
       url.searchParams.set("prompt", "consent");
-
       return { authUrl: url.toString(), configured: true } as const;
     }),
 
@@ -285,12 +333,7 @@ export const appRouter = router({
       .input(z.object({ groupId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const connection = await db.getCalendarConnection(ctx.user.id, "google");
-        if (!connection) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: "Please connect your Google Calendar first.",
-          });
-        }
+        if (!connection) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Please connect your Google Calendar first." });
         await db.upsertCalendarConnection(ctx.user.id, "google", {
           accessToken: connection.accessToken,
           refreshToken: connection.refreshToken,
@@ -313,33 +356,29 @@ export const appRouter = router({
       }),
 
     updatePreferences: protectedProcedure
-      .input(
-        z.object({
-          maxSpend: z.number().optional(),
-          maxTravelDistance: z.number().optional(),
-          vibes: z.array(z.string()).optional(),
-          cuisines: z.array(z.string()).optional(),
-          dietaryRestrictions: z.array(z.string()).optional(),
-          foodPreferences: z.array(z.string()).optional(),
-          preferredDays: z.array(z.string()).optional(),
-          meetupTimes: z.array(z.string()).optional(),
-          transportType: z.string().optional(),
-          indoorOutdoor: z.enum(["indoor", "outdoor", "both"]).optional(),
-          budgetTier: z.enum(["£", "££", "£££"]).optional(),
-          homeLat: z.string().optional(),
-          homeLng: z.string().optional(),
-          timezone: z.string().optional(),
-        })
-      )
+      .input(z.object({
+        maxSpend: z.number().optional(),
+        maxTravelDistance: z.number().optional(),
+        vibes: z.array(z.string()).optional(),
+        cuisines: z.array(z.string()).optional(),
+        dietaryRestrictions: z.array(z.string()).optional(),
+        foodPreferences: z.array(z.string()).optional(),
+        preferredDays: z.array(z.string()).optional(),
+        meetupTimes: z.array(z.string()).optional(),
+        transportType: z.string().optional(),
+        indoorOutdoor: z.enum(["indoor", "outdoor", "both"]).optional(),
+        budgetTier: z.enum(["£", "££", "£££"]).optional(),
+        homeLat: z.string().optional(),
+        homeLng: z.string().optional(),
+        timezone: z.string().optional(),
+      }))
       .mutation(async ({ ctx, input }) => {
         await db.upsertUserPreferences(ctx.user.id, {
           maxSpend: input.maxSpend,
           maxTravelDistance: input.maxTravelDistance,
           vibes: input.vibes ? JSON.stringify(input.vibes) : undefined,
           cuisines: input.cuisines ? JSON.stringify(input.cuisines) : undefined,
-          dietaryRestrictions: input.dietaryRestrictions
-            ? JSON.stringify(input.dietaryRestrictions)
-            : undefined,
+          dietaryRestrictions: input.dietaryRestrictions ? JSON.stringify(input.dietaryRestrictions) : undefined,
           foodPreferences: input.foodPreferences ? JSON.stringify(input.foodPreferences) : undefined,
           preferredDays: input.preferredDays ? JSON.stringify(input.preferredDays) : undefined,
           meetupTimes: input.meetupTimes ? JSON.stringify(input.meetupTimes) : undefined,

@@ -182,3 +182,23 @@ export const circlePreferences = pgTable(
 
 export type CirclePreference = typeof circlePreferences.$inferSelect;
 export type InsertCirclePreference = typeof circlePreferences.$inferInsert;
+
+// Member availability per circle — simple day × time-slot grid
+export const userAvailability = pgTable(
+  "user_availability",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    userId: integer("userId").notNull(),
+    circleId: varchar("circleId", { length: 36 }).notNull(),
+    availableDays: text("availableDays").notNull().default("[]"),
+    preferredTimes: text("preferredTimes").notNull().default("[]"),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_availability_user_circle_unique").on(table.userId, table.circleId),
+    index("user_availability_circleId_idx").on(table.circleId),
+  ]
+);
+
+export type UserAvailability = typeof userAvailability.$inferSelect;
+export type InsertUserAvailability = typeof userAvailability.$inferInsert;

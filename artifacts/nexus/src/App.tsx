@@ -21,6 +21,7 @@ function Router() {
       <Route path="/circles/:id" component={CircleDetail} />
       <Route path="/join/:token" component={JoinCircle} />
       <Route path="/preferences" component={Preferences} />
+      <Route path="/golden-window/:circleId" component={GoldenWindow} />
       <Route path="/golden-window" component={GoldenWindow} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

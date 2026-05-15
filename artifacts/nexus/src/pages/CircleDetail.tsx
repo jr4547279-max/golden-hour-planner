@@ -17,9 +17,11 @@ import {
   UserPlus, Zap, Copy, Check, Share2,
   RefreshCw, ShieldAlert, Settings2, Save,
   Coffee, Music, Briefcase as BriefcaseIcon, Building, Trees, Home,
+  CalendarDays,
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
+import AvailabilityModal from "@/components/AvailabilityModal";
 
 const CIRCLE_TYPES = [
   { value: "friends", label: "Friends", icon: Users2 },
@@ -433,6 +435,7 @@ export default function CircleDetail() {
   const circleId = params.id;
   const [inviteOpen, setInviteOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
+  const [availOpen, setAvailOpen] = useState(false);
 
   const { data: circle, isLoading, error } = trpc.circles.getById.useQuery(
     { id: circleId ?? "" },
@@ -651,22 +654,22 @@ export default function CircleDetail() {
             </button>
 
             <button
-              disabled
-              className="w-full flex items-center gap-4 p-4 rounded-xl border border-blue-900/40 bg-[#11112b]/60 hover:bg-[#11112b] hover:border-blue-700/50 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+              onClick={() => setAvailOpen(true)}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border border-blue-900/40 bg-[#11112b]/60 hover:bg-[#11112b] hover:border-blue-700/50 transition-all text-left group"
             >
               <div className="w-10 h-10 rounded-lg bg-blue-900/40 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-800/50 transition-colors">
-                <Calendar className="h-5 w-5 text-blue-300" />
+                <CalendarDays className="h-5 w-5 text-blue-300" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-white">Sync Calendars</div>
-                <div className="text-xs text-blue-200/40">Pull everyone's availability from Google Calendar</div>
+                <div className="font-medium text-white">Set My Availability</div>
+                <div className="text-xs text-blue-200/40">Tell the group which days and times work for you</div>
               </div>
-              <span className="text-xs text-blue-400/40 border border-blue-900/40 rounded-full px-2 py-0.5 flex-shrink-0">Soon</span>
+              <CalendarDays className="h-4 w-4 text-blue-400/40 group-hover:text-blue-300/60 transition-colors flex-shrink-0" />
             </button>
 
             <button
-              disabled
-              className="w-full flex items-center gap-4 p-4 rounded-xl border border-amber-900/30 bg-amber-950/10 hover:bg-amber-950/20 hover:border-amber-700/50 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+              onClick={() => setLocation(`/golden-window/${circleId}`)}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border border-amber-900/30 bg-amber-950/10 hover:bg-amber-950/20 hover:border-amber-700/50 transition-all text-left group"
             >
               <div className="w-10 h-10 rounded-lg bg-amber-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-800/40 transition-colors">
                 <Zap className="h-5 w-5 text-amber-400" />
@@ -675,7 +678,7 @@ export default function CircleDetail() {
                 <div className="font-medium text-amber-300">Find Golden Window</div>
                 <div className="text-xs text-amber-200/40">Discover the best time for everyone to meet</div>
               </div>
-              <span className="text-xs text-amber-400/40 border border-amber-900/40 rounded-full px-2 py-0.5 flex-shrink-0">Soon</span>
+              <Zap className="h-4 w-4 text-amber-400/40 group-hover:text-amber-300/60 transition-colors flex-shrink-0" />
             </button>
           </div>
         </div>
@@ -691,6 +694,13 @@ export default function CircleDetail() {
           isCreator={isCreator}
         />
       )}
+
+      <AvailabilityModal
+        open={availOpen}
+        onOpenChange={setAvailOpen}
+        circleId={circleId}
+        circleName={circle.name}
+      />
     </div>
   );
 }

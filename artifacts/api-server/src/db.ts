@@ -1,5 +1,5 @@
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { db, users, calendarConnections, availabilityWindows, userPreferences, groups, groupMembers, circleInvites, circlePreferences } from "@workspace/db";
+import { db, users, calendarConnections, availabilityWindows, userPreferences, groups, groupMembers, circleInvites, circlePreferences, userAvailability } from "@workspace/db";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -162,6 +162,52 @@ export async function upsertCirclePreferences(
   }
 }
 
+// ─── User Availability ────────────────────────────────────────────────────────
+
+export async function getUserAvailability(userId: number, circleId: string) {
+  const result = await db
+    .select()
+    .from(userAvailability)
+    .where(and(eq(userAvailability.userId, userId), eq(userAvailability.circleId, circleId)))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+export async function upsertUserAvailability(
+  userId: number,
+  circleId: string,
+  data: { availableDays: string[]; preferredTimes: string[] }
+): Promise<void> {
+  const existing = await getUserAvailability(userId, circleId);
+  const payload = {
+    availableDays: JSON.stringify(data.availableDays),
+    preferredTimes: JSON.stringify(data.preferredTimes),
+    updatedAt: new Date(),
+  };
+  if (existing) {
+    await db.update(userAvailability).set(payload).where(
+      and(eq(userAvailability.userId, userId), eq(userAvailability.circleId, circleId))
+    );
+  } else {
+    await db.insert(userAvailability).values({ id: nanoid(36), userId, circleId, ...payload });
+  }
+}
+
+export async function getCircleAvailability(circleId: string) {
+  const rows = await db
+    .select({
+      userId: userAvailability.userId,
+      availableDays: userAvailability.availableDays,
+      preferredTimes: userAvailability.preferredTimes,
+      name: users.name,
+      email: users.email,
+    })
+    .from(userAvailability)
+    .innerJoin(users, eq(userAvailability.userId, users.id))
+    .where(eq(userAvailability.circleId, circleId));
+  return rows;
+}
+
 // ─── Circles ─────────────────────────────────────────────────────────────────
 
 export type Circle = InferSelectModel<typeof groups>;
@@ -314,4 +360,17 @@ export async function isCircleMember(circleId: string, userId: number): Promise<
     .where(and(eq(groupMembers.groupId, circleId), eq(groupMembers.userId, userId)))
     .limit(1);
   return result.length > 0;
+}
+
+export async function getCircleMemberUserIds(circleId: string): Promise<number[]> {
+  const rows = await db
+    .select({ userId: groupMembers.userId })
+    .from(groupMembers)
+    .where(eq(groupMembers.groupId, circleId));
+  return rows.map((r) => r.userId);
+}
+
+export async function getUserPreferencesForUsers(userIds: number[]) {
+  if (userIds.length === 0) return [];
+  return db.select().from(userPreferences).where(inArray(userPreferences.userId, userIds));
 }
