@@ -138,6 +138,11 @@ export interface MemberPrefs {
   transportType: string | null;
   maxTravelDistance: number | null;
   meetupTimes: string[];       // from user_preferences (general preferred times)
+  // Extended v2
+  noisePreference: string | null;
+  energyLevel: number | null;  // 1 = chill, 5 = high energy
+  avoidVenues: string[];        // ['bars', 'crowded', ...]
+  prioritizeType: string | null;
 }
 
 export interface CirclePrefs {
@@ -220,7 +225,20 @@ function scoreVibe(
   availableUserIds: number[]
 ): { score: number; winner: string | null } {
   const relevantPrefs = memberPrefs.filter((p) => availableUserIds.includes(p.userId));
-  const allVibes = relevantPrefs.flatMap((p) => p.vibes);
+
+  // Build effective vibe list: merge explicit vibes + energyLevel hints
+  const allVibes = relevantPrefs.flatMap((p) => {
+    const vibes = [...p.vibes];
+    // energyLevel 1-2 → chill, 4-5 → lively (if not already set)
+    if (p.energyLevel !== null) {
+      if (p.energyLevel <= 2 && !vibes.includes("chill")) vibes.push("chill");
+      if (p.energyLevel >= 4 && !vibes.includes("lively")) vibes.push("lively");
+    }
+    // noisePreference also hints at vibe
+    if (p.noisePreference === "quiet" && !vibes.includes("chill")) vibes.push("chill");
+    if (p.noisePreference === "lively" && !vibes.includes("lively")) vibes.push("lively");
+    return vibes;
+  });
 
   // Circle override takes priority
   const circleVibes = safeParseJSON(circlePrefs?.defaultVibe ?? null);
@@ -228,9 +246,17 @@ function scoreVibe(
 
   if (!targetVibe) return { score: W.vibe * 0.6, winner: null };
 
-  const agreeing = relevantPrefs.filter((p) =>
-    p.vibes.length === 0 || p.vibes.includes(targetVibe)
-  ).length;
+  const agreeing = relevantPrefs.filter((p) => {
+    if (p.vibes.length === 0 && p.energyLevel === null && p.noisePreference === null) return true;
+    const effectiveVibes = [...p.vibes];
+    if (p.energyLevel !== null) {
+      if (p.energyLevel <= 2) effectiveVibes.push("chill");
+      if (p.energyLevel >= 4) effectiveVibes.push("lively");
+    }
+    if (p.noisePreference === "quiet") effectiveVibes.push("chill");
+    if (p.noisePreference === "lively") effectiveVibes.push("lively");
+    return effectiveVibes.length === 0 || effectiveVibes.includes(targetVibe);
+  }).length;
   const total = Math.max(relevantPrefs.length, 1);
   const score = Math.round((agreeing / total) * W.vibe * 10) / 10;
   return { score, winner: targetVibe };
@@ -244,14 +270,34 @@ function scoreVenue(
   const relevantPrefs = memberPrefs.filter((p) => availableUserIds.includes(p.userId));
   const circleVenueTypes = safeParseJSON(circlePrefs?.defaultVenueType ?? null);
 
+  // Build avoidance set: aggregate all members' avoidVenues
+  const globalAvoid = new Set(relevantPrefs.flatMap((p) => p.avoidVenues));
+
   // Derive preferred venue from indoor/outdoor prefs
   const allVenueTypes = relevantPrefs.flatMap((p) => {
-    if (p.indoorOutdoor === "indoor") return ["cafe", "restaurant", "indoor_activity"];
-    if (p.indoorOutdoor === "outdoor") return ["park", "outdoor_activity"];
-    return ["restaurant", "cafe", "bar"];
+    const candidates: string[] = [];
+    if (p.indoorOutdoor === "indoor") {
+      candidates.push("cafe", "restaurant", "indoor_activity");
+    } else if (p.indoorOutdoor === "outdoor") {
+      candidates.push("park", "outdoor_activity");
+    } else {
+      candidates.push("restaurant", "cafe");
+      if (!globalAvoid.has("bars")) candidates.push("bar");
+    }
+    return candidates;
   });
 
-  const targetVenue = circleVenueTypes[0] ?? mode(allVenueTypes);
+  // Filter out universally avoided venue types
+  const VENUE_TO_AVOID_TAG: Record<string, string> = {
+    bar: "bars",
+    "bar/pub": "bars",
+  };
+  const filtered = allVenueTypes.filter((v) => {
+    const avoidTag = VENUE_TO_AVOID_TAG[v];
+    return !avoidTag || !globalAvoid.has(avoidTag);
+  });
+
+  const targetVenue = circleVenueTypes[0] ?? mode(filtered.length > 0 ? filtered : allVenueTypes);
 
   if (!targetVenue) return { score: W.venue * 0.5, venueType: null };
 
