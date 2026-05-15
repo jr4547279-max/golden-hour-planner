@@ -8,18 +8,28 @@ let _db: ReturnType<typeof drizzle> | null = null;
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db) {
-    if (!process.env.DATABASE_URL) {
-      console.warn("[Database] DATABASE_URL is not set");
+    if (!ENV.databaseUrl) {
+      console.error("[Database] DATABASE_URL is not set");
       return null;
     }
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle(ENV.databaseUrl);
     } catch (error) {
       console.error("[Database] Failed to initialize drizzle:", error);
       _db = null;
     }
   }
   return _db;
+}
+
+export async function requireDb(operation: string) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error(
+      `Database is not available while trying to ${operation}. Check DATABASE_URL and database connectivity.`
+    );
+  }
+  return db;
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -94,27 +104,25 @@ export async function getUserByOpenId(openId: string) {
 }
 
 export async function getUserByEmail(email: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
+  const db = await requireDb("look up a user by email");
   const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
 }
 
 export async function createUser(user: InsertUser) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot create user: database not available");
-    return undefined;
-  }
-
+  const db = await requireDb("create a user");
   const [result] = await db.insert(users).values(user);
   const insertedId = (result as any).insertId;
+
+  if (!insertedId) {
+    throw new Error("Database insert did not return an inserted user id");
+  }
   
   const newUser = await db.select().from(users).where(eq(users.id, insertedId)).limit(1);
-  return newUser.length > 0 ? newUser[0] : undefined;
+  if (newUser.length === 0) {
+    throw new Error("User was inserted but could not be read back from the database");
+  }
+
+  return newUser[0];
 }
