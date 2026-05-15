@@ -1,0 +1,94 @@
+Implement the first real Golden Window recommendation engine using the existing Nexus preference system.
+
+Current state:
+
+- Auth works
+- Circles work
+- Invites work
+- Availability works
+- User preferences work
+- Circle preferences work
+- Members exist in circles
+
+The app now collects:
+
+- availability
+- meetup vibe
+- budget
+- venue preferences
+- travel preferences
+- food preferences
+- dietary requirements
+- indoor/outdoor preferences
+
+Goal:
+Generate intelligent Golden Window recommendations using all collected preference data.
+
+FEATURES TO BUILD
+
+1. GOLDEN WINDOW ENGINE
+   When a user presses:
+   “Find Golden Window”
+
+Calculate:
+
+- overlapping availability
+- preferred time overlap
+- vibe compatibility
+- venue compatibility
+- budget compatibility
+- food compatibility
+- dietary compatibility
+- travel compatibility
+- indoor/outdoor compatibility
+
+Use weighted scoring logic.
+
+Availability overlap should have the highest weight.
+
+Generate a final compatibility score out of 100.
+
+2. RESULTS EXPERIENCE
+   Create a premium results screen displaying:
+
+- Top 3 Golden Windows
+- Match percentage
+- Suggested day/time
+- Suggested meetup vibe
+- Suggested venue type
+- Suggested food type (if applicable)
+- Number of compatible members
+- Short explanation of why the recommendation was selected
+
+Example:
+Friday Evening
+94% Match
+Best for: Chill drinks & food
+Cuisine Match: Italian / Mediterranean
+Works for: 4/5 members
+Travel Fit: Within 20 mins for most members
+
+3. EMPTY STATES
+   If there is not enough overlap:
+
+- show a helpful fallback state
+- suggest ways to improve matching
+
+4. UI REQUIREMENTS
+
+- Keep the premium dark navy/gold Nexus design
+- Mobile-first
+- Add subtle premium animations/glows
+- Results should feel exciting and intelligent
+
+5. TECHNICAL REQUIREMENTS
+
+- Use deterministic/rule-based scoring only
+- Do not add AI yet
+- Keep scoring modular for future AI upgrades
+- Do not redesign the app
+- Do not break auth, invites, or circles
+
+IMPORTANT:
+This is the first true version of the Nexus coordination engine.
+Focus on believable, high-quality recommendations using the existing structured preference system.

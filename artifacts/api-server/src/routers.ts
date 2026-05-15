@@ -285,7 +285,12 @@ export const appRouter = router({
           vibes: safeParseJSON(p.vibes),
           budgetTier: p.budgetTier ?? null,
           indoorOutdoor: p.indoorOutdoor ?? null,
+          cuisines: safeParseJSON(p.cuisines),
+          dietaryRestrictions: safeParseJSON(p.dietaryRestrictions),
           foodPreferences: safeParseJSON(p.foodPreferences),
+          transportType: p.transportType ?? null,
+          maxTravelDistance: p.maxTravelDistance ?? null,
+          meetupTimes: safeParseJSON(p.meetupTimes),
         }));
 
         const results = calculateGoldenWindows(memberAvailability, memberPrefs, circlePrefs);
