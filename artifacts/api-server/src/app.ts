@@ -39,12 +39,14 @@ const TRUSTED_ORIGINS = new Set<string>(
   ].filter(Boolean) as string[]
 );
 
-// Also allow any origin that matches localhost on any port (dev convenience).
+// Also allow localhost and any Replit preview/dev domain.
 function isTrustedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
   if (TRUSTED_ORIGINS.has(origin)) return true;
   if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
   if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true;
+  if (/^https:\/\/[a-zA-Z0-9-]+(\.[\w-]+)*\.replit\.dev(:\d+)?$/.test(origin)) return true;
+  if (/^https:\/\/[a-zA-Z0-9-]+(\.[\w-]+)*\.repl\.co(:\d+)?$/.test(origin)) return true;
   return false;
 }
 
