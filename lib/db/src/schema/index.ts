@@ -94,12 +94,15 @@ export const userPreferences = pgTable(
 export type UserPreference = typeof userPreferences.$inferSelect;
 export type InsertUserPreference = typeof userPreferences.$inferInsert;
 
+export const circleTypeEnum = pgEnum("circle_type", ["friends", "family", "work", "date_night", "other"]);
+
 export const groups = pgTable(
   "groups",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
+    type: circleTypeEnum("type").default("friends").notNull(),
     createdBy: integer("createdBy").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -130,3 +133,26 @@ export const groupMembers = pgTable(
 
 export type GroupMember = typeof groupMembers.$inferSelect;
 export type InsertGroupMember = typeof groupMembers.$inferInsert;
+
+export const circleInviteStatusEnum = pgEnum("circle_invite_status", ["pending", "accepted", "declined"]);
+
+export const circleInvites = pgTable(
+  "circle_invites",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    circleId: varchar("circleId", { length: 36 }).notNull(),
+    invitedByUserId: integer("invitedByUserId").notNull(),
+    email: varchar("email", { length: 320 }).notNull(),
+    token: varchar("token", { length: 64 }).notNull().unique(),
+    status: circleInviteStatusEnum("status").default("pending").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+  },
+  (table) => [
+    index("circle_invites_circleId_idx").on(table.circleId),
+    index("circle_invites_email_idx").on(table.email),
+  ]
+);
+
+export type CircleInvite = typeof circleInvites.$inferSelect;
+export type InsertCircleInvite = typeof circleInvites.$inferInsert;

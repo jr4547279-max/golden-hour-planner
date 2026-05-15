@@ -1,5 +1,5 @@
-import { eq, and } from "drizzle-orm";
-import { db, users, calendarConnections, availabilityWindows, userPreferences, groups, groupMembers } from "@workspace/db";
+import { eq, and, sql, inArray } from "drizzle-orm";
+import { db, users, calendarConnections, availabilityWindows, userPreferences, groups, groupMembers, circleInvites } from "@workspace/db";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -54,7 +54,7 @@ export async function createUser(user: InsertUser): Promise<User> {
   return result[0];
 }
 
-// Calendar DB functions
+// ─── Calendar ────────────────────────────────────────────────────────────────
 
 type CalendarConnection = InferSelectModel<typeof calendarConnections>;
 
@@ -141,4 +141,94 @@ export async function upsertUserPreferences(
   } else {
     await db.insert(userPreferences).values({ id: nanoid(36), userId, ...data });
   }
+}
+
+// ─── Circles ─────────────────────────────────────────────────────────────────
+
+export type Circle = InferSelectModel<typeof groups>;
+export type InsertCircle = InferInsertModel<typeof groups>;
+export type CircleInvite = InferSelectModel<typeof circleInvites>;
+
+export type CircleType = "friends" | "family" | "work" | "date_night" | "other";
+
+export async function createCircle(
+  userId: number,
+  data: { name: string; description?: string | null; type: CircleType }
+): Promise<Circle> {
+  const circleId = nanoid(36);
+  const [circle] = await db
+    .insert(groups)
+    .values({
+      id: circleId,
+      name: data.name,
+      description: data.description ?? null,
+      type: data.type,
+      createdBy: userId,
+    })
+    .returning();
+  if (!circle) throw new Error("Failed to create circle");
+
+  await db.insert(groupMembers).values({
+    id: nanoid(36),
+    groupId: circleId,
+    userId,
+    role: "admin",
+  });
+
+  return circle;
+}
+
+export async function getCirclesByUser(userId: number): Promise<Circle[]> {
+  const memberRows = await db
+    .select({ groupId: groupMembers.groupId })
+    .from(groupMembers)
+    .where(eq(groupMembers.userId, userId));
+
+  if (memberRows.length === 0) return [];
+
+  const circleIds = memberRows.map((r) => r.groupId);
+
+  const result = await db
+    .select()
+    .from(groups)
+    .where(inArray(groups.id, circleIds));
+
+  return result;
+}
+
+export async function getCircleById(circleId: string): Promise<Circle | null> {
+  const result = await db.select().from(groups).where(eq(groups.id, circleId)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function getCircleMemberCount(circleId: string): Promise<number> {
+  const result = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(groupMembers)
+    .where(eq(groupMembers.groupId, circleId));
+  return result[0]?.count ?? 0;
+}
+
+export async function getCirclePendingInviteCount(circleId: string): Promise<number> {
+  const result = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(circleInvites)
+    .where(and(eq(circleInvites.circleId, circleId), eq(circleInvites.status, "pending")));
+  return result[0]?.count ?? 0;
+}
+
+export async function getCircleCreator(circleId: string): Promise<User | null> {
+  const circle = await getCircleById(circleId);
+  if (!circle) return null;
+  const result = await db.select().from(users).where(eq(users.id, circle.createdBy)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function isCircleMember(circleId: string, userId: number): Promise<boolean> {
+  const result = await db
+    .select({ id: groupMembers.id })
+    .from(groupMembers)
+    .where(and(eq(groupMembers.groupId, circleId), eq(groupMembers.userId, userId)))
+    .limit(1);
+  return result.length > 0;
 }

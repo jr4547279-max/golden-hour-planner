@@ -27,6 +27,8 @@ function ensureAuthConfig() {
   }
 }
 
+const circleTypeSchema = z.enum(["friends", "family", "work", "date_night", "other"]);
+
 export const appRouter = router({
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
@@ -93,6 +95,57 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, clearSessionCookieOptions(ctx.req));
       return { success: true } as const;
     }),
+  }),
+
+  circles: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const circles = await db.getCirclesByUser(ctx.user.id);
+      return circles;
+    }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().trim().min(1, "Circle name is required").max(100),
+          description: z.string().trim().max(500).optional(),
+          type: circleTypeSchema,
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const circle = await db.createCircle(ctx.user.id, {
+          name: input.name,
+          description: input.description ?? null,
+          type: input.type,
+        });
+        return { success: true, circle };
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const circle = await db.getCircleById(input.id);
+        if (!circle) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Circle not found" });
+        }
+
+        const isMember = await db.isCircleMember(input.id, ctx.user.id);
+        if (!isMember) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
+        }
+
+        const [memberCount, pendingInvites, creator] = await Promise.all([
+          db.getCircleMemberCount(input.id),
+          db.getCirclePendingInviteCount(input.id),
+          db.getCircleCreator(input.id),
+        ]);
+
+        return {
+          ...circle,
+          memberCount,
+          pendingInvites,
+          creator: creator ? { id: creator.id, name: creator.name, email: creator.email } : null,
+        };
+      }),
   }),
 
   calendar: router({
