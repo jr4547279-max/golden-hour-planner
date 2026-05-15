@@ -10,6 +10,7 @@ import GoldenWindow from "./pages/GoldenWindow";
 import AuthPage from "./pages/AuthPage";
 import Circles from "./pages/Circles";
 import CircleDetail from "./pages/CircleDetail";
+import JoinCircle from "./pages/JoinCircle";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/login" component={AuthPage} />
       <Route path="/circles" component={Circles} />
       <Route path="/circles/:id" component={CircleDetail} />
+      <Route path="/join/:token" component={JoinCircle} />
       <Route path="/preferences" component={Preferences} />
       <Route path="/golden-window" component={GoldenWindow} />
       <Route path="/404" component={NotFound} />

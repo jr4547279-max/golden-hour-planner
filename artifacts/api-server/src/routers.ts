@@ -133,18 +133,76 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
         }
 
-        const [memberCount, pendingInvites, creator] = await Promise.all([
+        const [memberCount, pendingInvites, creator, inviteToken] = await Promise.all([
           db.getCircleMemberCount(input.id),
           db.getCirclePendingInviteCount(input.id),
           db.getCircleCreator(input.id),
+          db.ensureInviteToken(input.id),
         ]);
 
         return {
           ...circle,
+          inviteToken,
           memberCount,
           pendingInvites,
           creator: creator ? { id: creator.id, name: creator.name, email: creator.email } : null,
         };
+      }),
+
+    getMembers: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const isMember = await db.isCircleMember(input.id, ctx.user.id);
+        if (!isMember) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
+        }
+        return db.getCircleMembers(input.id);
+      }),
+
+    getByToken: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const circle = await db.getCircleByInviteToken(input.token);
+        if (!circle) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired invite link" });
+        }
+        const [memberCount, creator] = await Promise.all([
+          db.getCircleMemberCount(circle.id),
+          db.getCircleCreator(circle.id),
+        ]);
+        return {
+          id: circle.id,
+          name: circle.name,
+          type: circle.type,
+          description: circle.description,
+          memberCount,
+          creatorName: creator?.name || creator?.email || null,
+        };
+      }),
+
+    joinByToken: protectedProcedure
+      .input(z.object({ token: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const circle = await db.getCircleByInviteToken(input.token);
+        if (!circle) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired invite link" });
+        }
+        const { alreadyMember } = await db.joinCircle(circle.id, ctx.user.id);
+        return { success: true, circleId: circle.id, alreadyMember };
+      }),
+
+    regenerateInviteLink: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const circle = await db.getCircleById(input.id);
+        if (!circle) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Circle not found" });
+        }
+        if (circle.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the circle creator can regenerate the invite link" });
+        }
+        const token = await db.regenerateInviteToken(input.id);
+        return { success: true, inviteToken: token };
       }),
   }),
 

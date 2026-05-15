@@ -104,10 +104,14 @@ export const groups = pgTable(
     description: text("description"),
     type: circleTypeEnum("type").default("friends").notNull(),
     createdBy: integer("createdBy").notNull(),
+    inviteToken: varchar("inviteToken", { length: 64 }).unique(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   },
-  (table) => [index("groups_createdBy_idx").on(table.createdBy)]
+  (table) => [
+    index("groups_createdBy_idx").on(table.createdBy),
+    index("groups_inviteToken_idx").on(table.inviteToken),
+  ]
 );
 
 export type Group = typeof groups.$inferSelect;

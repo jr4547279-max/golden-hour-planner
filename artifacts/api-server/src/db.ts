@@ -151,11 +151,25 @@ export type CircleInvite = InferSelectModel<typeof circleInvites>;
 
 export type CircleType = "friends" | "family" | "work" | "date_night" | "other";
 
+export type CircleMember = {
+  id: string;
+  userId: number;
+  role: string;
+  joinedAt: Date;
+  name: string | null;
+  email: string | null;
+};
+
+function generateInviteToken(): string {
+  return nanoid(32);
+}
+
 export async function createCircle(
   userId: number,
   data: { name: string; description?: string | null; type: CircleType }
 ): Promise<Circle> {
   const circleId = nanoid(36);
+  const inviteToken = generateInviteToken();
   const [circle] = await db
     .insert(groups)
     .values({
@@ -164,6 +178,7 @@ export async function createCircle(
       description: data.description ?? null,
       type: data.type,
       createdBy: userId,
+      inviteToken,
     })
     .returning();
   if (!circle) throw new Error("Failed to create circle");
@@ -176,6 +191,55 @@ export async function createCircle(
   });
 
   return circle;
+}
+
+export async function ensureInviteToken(circleId: string): Promise<string> {
+  const circle = await getCircleById(circleId);
+  if (!circle) throw new Error("Circle not found");
+  if (circle.inviteToken) return circle.inviteToken;
+  const token = generateInviteToken();
+  await db.update(groups).set({ inviteToken: token }).where(eq(groups.id, circleId));
+  return token;
+}
+
+export async function regenerateInviteToken(circleId: string): Promise<string> {
+  const token = generateInviteToken();
+  await db.update(groups).set({ inviteToken: token }).where(eq(groups.id, circleId));
+  return token;
+}
+
+export async function getCircleByInviteToken(token: string): Promise<Circle | null> {
+  const result = await db.select().from(groups).where(eq(groups.inviteToken, token)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function joinCircle(circleId: string, userId: number): Promise<{ alreadyMember: boolean }> {
+  const already = await isCircleMember(circleId, userId);
+  if (already) return { alreadyMember: true };
+  await db.insert(groupMembers).values({
+    id: nanoid(36),
+    groupId: circleId,
+    userId,
+    role: "member",
+  });
+  return { alreadyMember: false };
+}
+
+export async function getCircleMembers(circleId: string): Promise<CircleMember[]> {
+  const rows = await db
+    .select({
+      id: groupMembers.id,
+      userId: groupMembers.userId,
+      role: groupMembers.role,
+      joinedAt: groupMembers.joinedAt,
+      name: users.name,
+      email: users.email,
+    })
+    .from(groupMembers)
+    .innerJoin(users, eq(groupMembers.userId, users.id))
+    .where(eq(groupMembers.groupId, circleId))
+    .orderBy(groupMembers.joinedAt);
+  return rows;
 }
 
 export async function getCirclesByUser(userId: number): Promise<Circle[]> {

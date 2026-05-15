@@ -1,13 +1,24 @@
+import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   ArrowLeft, Loader2, Users, Calendar, Sparkles,
   Heart, Briefcase, Star, Users2, Crown,
-  UserPlus, Zap,
+  UserPlus, Zap, Copy, Check, Share2,
+  RefreshCw, ShieldAlert,
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
+import { toast } from "sonner";
 
 const CIRCLE_TYPES = [
   { value: "friends", label: "Friends", icon: Users2 },
@@ -49,13 +60,187 @@ function typeAccentColor(type: string) {
   return map[type] ?? map.other;
 }
 
+function initials(name: string | null, email: string | null): string {
+  const src = name || email || "?";
+  const parts = src.split(/[\s@.]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0]! + parts[1][0]!).toUpperCase();
+  return src.slice(0, 2).toUpperCase();
+}
+
+function MemberAvatar({ name, email, role }: { name: string | null; email: string | null; role: string }) {
+  const bg = role === "admin"
+    ? "bg-gradient-to-br from-amber-700 to-amber-900"
+    : "bg-gradient-to-br from-blue-700 to-blue-900";
+  return (
+    <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center flex-shrink-0`}>
+      <span className="text-xs font-bold text-white">{initials(name, email)}</span>
+    </div>
+  );
+}
+
+function InviteDialog({
+  open,
+  onOpenChange,
+  circleName,
+  inviteToken,
+  circleId,
+  isCreator,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  circleName: string;
+  inviteToken: string;
+  circleId: string;
+  isCreator: boolean;
+}) {
+  const utils = trpc.useUtils();
+  const [copied, setCopied] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+
+  const inviteUrl = `${window.location.origin}/join/${inviteToken}`;
+
+  const regenMutation = trpc.circles.regenerateInviteLink.useMutation({
+    onSuccess: () => {
+      utils.circles.getById.invalidate({ id: circleId });
+      setConfirmRegen(false);
+      toast.success("Invite link regenerated");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  function handleCopy() {
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setCopied(true);
+      toast.success("Invite link copied!");
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      toast.error("Failed to copy link");
+    });
+  }
+
+  function handleShare() {
+    if (typeof navigator.share === "function") {
+      navigator.share({
+        title: `Join ${circleName} on Nexus`,
+        text: `You're invited to join the ${circleName} circle on Nexus — Golden Window Planner.`,
+        url: inviteUrl,
+      }).catch(() => {});
+    } else {
+      handleCopy();
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); setConfirmRegen(false); }}>
+      <DialogContent className="bg-[#11112b] border-blue-900/40 text-white max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-white flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-blue-400" />
+            Invite to {circleName}
+          </DialogTitle>
+          <DialogDescription className="text-blue-200/50">
+            Share this link with people you want to invite. Anyone with the link can join.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-xs text-blue-200/50 uppercase tracking-wider font-semibold">Invite Link</p>
+            <div className="flex gap-2">
+              <Input
+                readOnly
+                value={inviteUrl}
+                className="bg-blue-950/40 border-blue-900/40 text-blue-200 text-xs font-mono flex-1"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-blue-800/60 hover:bg-blue-700/70 text-white border border-blue-700/40"
+                variant="outline"
+                size="sm"
+                onClick={handleCopy}
+              >
+                {copied ? (
+                  <><Check className="mr-1.5 h-3.5 w-3.5 text-green-400" /> Copied!</>
+                ) : (
+                  <><Copy className="mr-1.5 h-3.5 w-3.5" /> Copy Link</>
+                )}
+              </Button>
+              <Button
+                className="flex-1 bg-blue-800/60 hover:bg-blue-700/70 text-white border border-blue-700/40"
+                variant="outline"
+                size="sm"
+                onClick={handleShare}
+              >
+                <Share2 className="mr-1.5 h-3.5 w-3.5" /> Share
+              </Button>
+            </div>
+          </div>
+
+          {isCreator && (
+            <div className="pt-2 border-t border-blue-900/30">
+              {!confirmRegen ? (
+                <button
+                  className="w-full flex items-center gap-2 text-xs text-blue-400/60 hover:text-blue-300/80 transition-colors py-1"
+                  onClick={() => setConfirmRegen(true)}
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Regenerate link (invalidates current link)
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-900/20 border border-amber-900/30">
+                    <ShieldAlert className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-300/80">
+                      This will invalidate the current invite link. Anyone who has it will no longer be able to join.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 border-blue-900/40 text-blue-300"
+                      onClick={() => setConfirmRegen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-amber-700 hover:bg-amber-600 text-white"
+                      onClick={() => regenMutation.mutate({ id: circleId })}
+                      disabled={regenMutation.isPending}
+                    >
+                      {regenMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        "Regenerate"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function CircleDetail() {
   const { user } = useAuth({ redirectOnUnauthenticated: true });
   const [, setLocation] = useLocation();
   const params = useParams<{ id: string }>();
   const circleId = params.id;
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const { data: circle, isLoading, error } = trpc.circles.getById.useQuery(
+    { id: circleId ?? "" },
+    { enabled: Boolean(circleId) }
+  );
+
+  const { data: members } = trpc.circles.getMembers.useQuery(
     { id: circleId ?? "" },
     { enabled: Boolean(circleId) }
   );
@@ -93,7 +278,6 @@ export default function CircleDetail() {
   return (
     <div className="min-h-screen bg-[#0a0a1a] p-4">
       <div className="max-w-2xl mx-auto space-y-6">
-        {/* Back nav */}
         <Button
           variant="ghost"
           size="sm"
@@ -166,23 +350,61 @@ export default function CircleDetail() {
           </CardContent>
         </Card>
 
+        {/* Members section */}
+        {members && members.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-blue-200/50 uppercase tracking-wider px-1">
+              Members · {members.length}
+            </h2>
+            <Card className="border-blue-900/30 bg-[#11112b]/60">
+              <CardContent className="p-0">
+                {members.map((m, i) => (
+                  <div
+                    key={m.id}
+                    className={`flex items-center gap-3 px-4 py-3 ${i < members.length - 1 ? "border-b border-blue-900/20" : ""}`}
+                  >
+                    <MemberAvatar name={m.name} email={m.email} role={m.role} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium truncate">
+                        {m.name || m.email || "Unknown"}
+                        {m.userId === user?.id && (
+                          <span className="ml-1.5 text-xs text-blue-400/50 font-normal">· You</span>
+                        )}
+                      </p>
+                      {m.name && m.email && (
+                        <p className="text-blue-200/40 text-xs truncate">{m.email}</p>
+                      )}
+                    </div>
+                    {m.role === "admin" && (
+                      <span className="flex items-center gap-1 text-xs text-amber-400/70 border border-amber-900/30 rounded-full px-2 py-0.5 flex-shrink-0">
+                        <Crown className="h-3 w-3" />
+                        Admin
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-blue-200/50 uppercase tracking-wider px-1">Actions</h2>
 
           <div className="grid grid-cols-1 gap-3">
             <button
-              disabled
-              className="w-full flex items-center gap-4 p-4 rounded-xl border border-blue-900/40 bg-[#11112b]/60 hover:bg-[#11112b] hover:border-blue-700/50 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+              onClick={() => setInviteOpen(true)}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border border-blue-900/40 bg-[#11112b]/60 hover:bg-[#11112b] hover:border-blue-700/50 transition-all text-left group"
             >
               <div className="w-10 h-10 rounded-lg bg-blue-900/40 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-800/50 transition-colors">
                 <UserPlus className="h-5 w-5 text-blue-300" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-white">Invite Members</div>
-                <div className="text-xs text-blue-200/40">Share a link or send email invites</div>
+                <div className="text-xs text-blue-200/40">Share a link to invite people to this circle</div>
               </div>
-              <span className="text-xs text-blue-400/40 border border-blue-900/40 rounded-full px-2 py-0.5 flex-shrink-0">Soon</span>
+              <Share2 className="h-4 w-4 text-blue-400/40 group-hover:text-blue-300/60 transition-colors flex-shrink-0" />
             </button>
 
             <button
@@ -215,6 +437,17 @@ export default function CircleDetail() {
           </div>
         </div>
       </div>
+
+      {circle.inviteToken && (
+        <InviteDialog
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+          circleName={circle.name}
+          inviteToken={circle.inviteToken}
+          circleId={circle.id}
+          isCreator={isCreator}
+        />
+      )}
     </div>
   );
 }
