@@ -63,7 +63,7 @@ class SDKServer {
         return null;
       }
 
-      return { openId, appId, name: (name as string) ?? "", email: email as string | undefined };
+      return { openId, appId: (appId as string) ?? "", name: (name as string) ?? "", email: typeof email === "string" ? email : undefined };
     } catch {
       return null;
     }
