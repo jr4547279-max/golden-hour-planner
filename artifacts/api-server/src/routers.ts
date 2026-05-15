@@ -113,20 +113,20 @@ export const appRouter = router({
       }
 
       const host = ctx.req.headers.host ?? "";
-      const origin = ctx.req.headers.origin ?? `https://${host}`;
-      const redirectUri = `${origin}/api/oauth/google/callback`;
-      const scopes = [
-        "https://www.googleapis.com/auth/calendar.readonly",
-        "openid",
-        "email",
-        "profile",
-      ].join(" ");
+      const origin = (ctx.req.headers.origin as string | undefined) ?? `https://${host}`;
+      const redirectUri = `${origin}/api/oauth/calendar/callback`;
 
+      const state = Buffer.from(JSON.stringify({ userId: ctx.user.id })).toString("base64");
       const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       url.searchParams.set("client_id", clientId);
       url.searchParams.set("redirect_uri", redirectUri);
       url.searchParams.set("response_type", "code");
-      url.searchParams.set("scope", scopes);
+      url.searchParams.set("scope", [
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "openid",
+      ].join(" "));
+      url.searchParams.set("state", state);
       url.searchParams.set("access_type", "offline");
       url.searchParams.set("prompt", "consent");
 

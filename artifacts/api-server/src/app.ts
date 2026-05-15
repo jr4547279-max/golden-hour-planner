@@ -5,6 +5,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "./routers";
 import { createContext } from "./context";
 import { logger } from "./lib/logger";
+import { registerOAuthRoutes } from "./oauth";
 
 const app: Express = express();
 
@@ -24,13 +25,26 @@ app.use(
   })
 );
 
+// Build an explicit allowlist of trusted origins at startup.
+// We include localhost for dev and the specific Replit dev/prod domains.
+const TRUSTED_ORIGINS = new Set<string>(
+  [
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "http://localhost:18245",
+    process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : null,
+    process.env.VITE_APP_URL ?? null,
+  ].filter(Boolean) as string[]
+);
+
+// Also allow any origin that matches localhost on any port (dev convenience).
 function isTrustedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
+  if (TRUSTED_ORIGINS.has(origin)) return true;
   if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
   if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true;
-  if (origin.endsWith(".replit.dev")) return true;
-  if (origin.endsWith(".repl.co")) return true;
-  if (origin.endsWith(".replit.app")) return true;
   return false;
 }
 
@@ -40,7 +54,7 @@ app.use(
       if (!origin || isTrustedOrigin(origin)) {
         cb(null, origin ?? "*");
       } else {
-        cb(new Error(`CORS: origin not allowed: ${origin}`));
+        cb(new Error(`CORS: untrusted origin: ${origin}`));
       }
     },
     credentials: true,
@@ -59,6 +73,8 @@ app.get("/api/health", (_req, res) => {
 app.get("/api/healthz", (_req, res) => {
   res.json({ status: "ok" });
 });
+
+registerOAuthRoutes(app);
 
 app.use(
   "/api/trpc",
