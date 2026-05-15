@@ -48,23 +48,27 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
+  // In Vercel, the dist folder is relative to the project root
   const distPath = path.resolve(process.cwd(), "dist", "public");
+  const fallbackDistPath = path.resolve(import.meta.dirname, "../../dist/public");
   
-  if (!fs.existsSync(distPath)) {
+  const finalDistPath = fs.existsSync(distPath) ? distPath : fallbackDistPath;
+
+  if (!fs.existsSync(finalDistPath)) {
     console.error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
+      `Could not find the build directory: ${finalDistPath}, searched in ${distPath} and ${fallbackDistPath}`
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(express.static(finalDistPath));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
-    const indexPath = path.resolve(distPath, "index.html");
+    const indexPath = path.resolve(finalDistPath, "index.html");
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
     } else {
-      res.status(404).send("Frontend build not found. Please ensure the build command ran successfully.");
+      res.status(404).send(`Frontend build not found at ${indexPath}. Please ensure the build command ran successfully.`);
     }
   });
 }
