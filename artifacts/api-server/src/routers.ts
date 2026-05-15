@@ -109,6 +109,65 @@ export const appRouter = router({
       };
     }),
 
+    // Returns the Google OAuth URL the user should be redirected to in order
+    // to connect their calendar. Requires VITE_GOOGLE_CLIENT_ID and the app
+    // to be running on a known domain (used as the redirect_uri).
+    getAuthUrl: protectedProcedure.query(({ ctx }) => {
+      const clientId = ENV.googleClientId;
+      if (!clientId) {
+        // OAuth is not configured — return null so the frontend can show a
+        // disabled state instead of crashing.
+        return { authUrl: null, configured: false } as const;
+      }
+
+      const origin =
+        ctx.req.headers.origin ||
+        ctx.req.headers.host
+          ? `https://${ctx.req.headers.host}`
+          : ENV.appUrl;
+
+      const redirectUri = `${origin}/api/oauth/google/callback`;
+      const scopes = [
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "openid",
+        "email",
+        "profile",
+      ].join(" ");
+
+      const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+      url.searchParams.set("client_id", clientId);
+      url.searchParams.set("redirect_uri", redirectUri);
+      url.searchParams.set("response_type", "code");
+      url.searchParams.set("scope", scopes);
+      url.searchParams.set("access_type", "offline");
+      url.searchParams.set("prompt", "consent");
+
+      return { authUrl: url.toString(), configured: true } as const;
+    }),
+
+    // Manually trigger an availability sync for a group. Currently a stub —
+    // full implementation requires the Google Calendar API integration.
+    syncAvailability: protectedProcedure
+      .input(z.object({ groupId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const connection = await db.getCalendarConnection(ctx.user.id, "google");
+        if (!connection) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Please connect your Google Calendar first.",
+          });
+        }
+        // Mark last synced timestamp — full calendar fetch is a follow-up task.
+        await db.upsertCalendarConnection(ctx.user.id, "google", {
+          accessToken: connection.accessToken,
+          refreshToken: connection.refreshToken,
+          expiresAt: connection.expiresAt,
+          email: connection.email,
+          lastSynced: new Date(),
+        });
+        return { success: true, groupId: input.groupId } as const;
+      }),
+
     disconnect: protectedProcedure.mutation(async ({ ctx }) => {
       await db.deleteCalendarConnection(ctx.user.id, "google");
       return { success: true };

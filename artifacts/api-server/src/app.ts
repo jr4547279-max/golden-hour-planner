@@ -26,9 +26,27 @@ app.use(
   })
 );
 
+// CORS: only allow requests from origins that are either localhost (dev) or
+// ending in known Replit domains. Credentials are needed for cookie auth.
+function isTrustedOrigin(origin: string | undefined): boolean {
+  if (!origin) return false;
+  if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
+  if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true;
+  if (origin.endsWith(".replit.dev")) return true;
+  if (origin.endsWith(".repl.co")) return true;
+  if (origin.endsWith(".replit.app")) return true;
+  return false;
+}
+
 app.use(
   cors({
-    origin: (origin, cb) => cb(null, origin ?? true),
+    origin: (origin, cb) => {
+      if (!origin || isTrustedOrigin(origin)) {
+        cb(null, origin ?? "*");
+      } else {
+        cb(new Error(`CORS: origin not allowed: ${origin}`));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
