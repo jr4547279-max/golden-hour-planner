@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuthContext as useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Calendar, Users, MapPin } from "lucide-react";
@@ -6,6 +6,7 @@ import { useLocation } from "wouter";
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth();
+  const displayName = (user?.user_metadata?.name as string | undefined) || user?.email?.split("@")[0] || "User";
   const [, setLocation] = useLocation();
 
   if (loading) {
@@ -81,7 +82,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto p-4 space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Welcome, {user?.name || "User"}!</h1>
+            <h1 className="text-3xl font-bold text-foreground">Welcome, {displayName}!</h1>
             <p className="text-muted-foreground">Find your Golden Windows</p>
           </div>
           <Button variant="outline" onClick={() => logout()}>

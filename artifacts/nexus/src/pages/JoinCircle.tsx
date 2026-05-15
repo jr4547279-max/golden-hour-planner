@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuthContext as useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,7 +40,7 @@ function typeBadgeColor(type: string) {
     date_night: "bg-purple-900/40 text-purple-300 border-purple-800/50",
     other: "bg-slate-800/60 text-slate-300 border-slate-700/50",
   };
-  return map[type] ?? map.other;
+  return map[type] ?? map.other!;
 }
 
 function typeAccentColor(type: string) {
@@ -50,7 +51,7 @@ function typeAccentColor(type: string) {
     date_night: "from-purple-600 to-purple-800",
     other: "from-slate-600 to-slate-800",
   };
-  return map[type] ?? map.other;
+  return map[type] ?? map.other!;
 }
 
 export default function JoinCircle() {
@@ -68,6 +69,7 @@ export default function JoinCircle() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading2, setAuthLoading2] = useState(false);
 
   const { data: circle, isLoading: circleLoading, error: circleError } = trpc.circles.getByToken.useQuery(
     { token },
@@ -83,27 +85,43 @@ export default function JoinCircle() {
     onError: (err: any) => setJoinError(err.message),
   });
 
-  const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: (data: any) => {
-      utils.auth.me.setData(undefined, data.user as any);
-      setJustAuthed(true);
-    },
-    onError: (err: any) => setAuthError(err.message || "Login failed"),
-  });
-
-  const signupMutation = trpc.auth.signup.useMutation({
-    onSuccess: (data: any) => {
-      utils.auth.me.setData(undefined, data.user as any);
-      setJustAuthed(true);
-    },
-    onError: (err: any) => setAuthError(err.message || "Sign up failed"),
-  });
-
   useEffect(() => {
     if (isAuthenticated && user && circle && justAuthed && !joined && !joinMutation.isPending) {
       joinMutation.mutate({ token });
     }
   }, [isAuthenticated, user, circle, justAuthed]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthLoading2(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setAuthLoading2(false);
+    if (error) {
+      setAuthError(error.message === "Invalid login credentials"
+        ? "Incorrect email or password."
+        : error.message);
+    } else {
+      setJustAuthed(true);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthLoading2(true);
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
+    });
+    setAuthLoading2(false);
+    if (error) {
+      setAuthError(error.message);
+    } else {
+      setJustAuthed(true);
+    }
+  };
 
   if (!token) {
     return (
@@ -151,6 +169,8 @@ export default function JoinCircle() {
     );
   }
 
+  const displayName = (user?.user_metadata?.name as string | undefined) || user?.email;
+
   return (
     <div className="min-h-screen bg-[#0a0a1a] flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-900/20 rounded-full blur-[120px]" />
@@ -196,7 +216,7 @@ export default function JoinCircle() {
             <CardContent className="p-5 space-y-4">
               <div className="text-center">
                 <p className="text-white font-medium">
-                  Joining as <span className="text-amber-400">{user?.name || user?.email}</span>
+                  Joining as <span className="text-amber-400">{displayName}</span>
                 </p>
               </div>
               {joinError && (
@@ -241,14 +261,7 @@ export default function JoinCircle() {
                 )}
 
                 <TabsContent value="login">
-                  <form
-                    className="space-y-3"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      setAuthError(null);
-                      loginMutation.mutate({ email, password });
-                    }}
-                  >
+                  <form className="space-y-3" onSubmit={handleLogin}>
                     <div className="space-y-1">
                       <Label className="text-blue-100/70 text-sm">Email</Label>
                       <Input
@@ -274,23 +287,16 @@ export default function JoinCircle() {
                     <Button
                       type="submit"
                       className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white"
-                      disabled={loginMutation.isPending}
+                      disabled={authLoading2}
                     >
-                      {loginMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {authLoading2 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       Log In & Join
                     </Button>
                   </form>
                 </TabsContent>
 
                 <TabsContent value="signup">
-                  <form
-                    className="space-y-3"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      setAuthError(null);
-                      signupMutation.mutate({ email, password, name });
-                    }}
-                  >
+                  <form className="space-y-3" onSubmit={handleSignup}>
                     <div className="space-y-1">
                       <Label className="text-blue-100/70 text-sm">Display Name</Label>
                       <Input
@@ -328,9 +334,9 @@ export default function JoinCircle() {
                     <Button
                       type="submit"
                       className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white"
-                      disabled={signupMutation.isPending}
+                      disabled={authLoading2}
                     >
-                      {signupMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {authLoading2 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       Sign Up & Join
                     </Button>
                   </form>

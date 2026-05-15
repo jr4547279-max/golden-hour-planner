@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuthContext as useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Loader2, LogOut, ArrowLeft, Save, Check,
@@ -326,7 +326,7 @@ const MAX_TRAVEL_OPTIONS = [
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Preferences() {
-  const { user, logout } = useAuth({ redirectOnUnauthenticated: true });
+  const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -479,12 +479,12 @@ export default function Preferences() {
         >
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center flex-shrink-0">
             <span className="text-base font-bold text-white">
-              {(user.name || user.email || "?")[0]!.toUpperCase()}
+              {((user?.user_metadata?.name as string | undefined) || user?.email || "?")[0]!.toUpperCase()}
             </span>
           </div>
           <div className="min-w-0">
-            <p className="text-white font-semibold text-sm truncate">{user.name || "No name set"}</p>
-            <p className="text-blue-200/40 text-xs truncate">{user.email || ""}</p>
+            <p className="text-white font-semibold text-sm truncate">{(user?.user_metadata?.name as string | undefined) || user?.email?.split("@")[0] || "No name set"}</p>
+            <p className="text-blue-200/40 text-xs truncate">{user?.email || ""}</p>
           </div>
           <div className="ml-auto flex-shrink-0">
             <span className="text-[10px] px-2 py-1 rounded-full border border-amber-500/30 text-amber-400/70 font-medium">

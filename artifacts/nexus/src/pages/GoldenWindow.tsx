@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuthContext as useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
@@ -427,7 +427,7 @@ function EmptyState({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function GoldenWindow() {
-  useAuth({ redirectOnUnauthenticated: true });
+  useAuth();
   const [, setLocation] = useLocation();
   const params = useParams<{ circleId: string }>();
   const circleId = params.circleId ?? "";

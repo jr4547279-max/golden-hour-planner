@@ -1,12 +1,11 @@
 import { trpc } from "@/lib/trpc";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink, TRPCClientError } from "@trpc/client";
+import { httpBatchLink } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import "./index.css";
-
-const UNAUTHED_ERR_MSG = "Please login (10001)";
+import { supabase } from "@/lib/supabase";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,36 +16,26 @@ const queryClient = new QueryClient({
   },
 });
 
-const redirectToLoginIfUnauthorized = (error: unknown) => {
-  if (!(error instanceof TRPCClientError)) return;
-  if (typeof window === "undefined") return;
-  if (error.message === UNAUTHED_ERR_MSG) {
-    window.location.href = "/login";
-  }
-};
-
-queryClient.getQueryCache().subscribe((event) => {
-  if (event.type === "updated" && event.action.type === "error") {
-    redirectToLoginIfUnauthorized(event.query.state.error);
-  }
-});
-
-queryClient.getMutationCache().subscribe((event) => {
-  if (event.type === "updated" && event.action.type === "error") {
-    redirectToLoginIfUnauthorized(event.mutation.state.error);
-  }
-});
-
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
-      fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
+      async headers() {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        const user = data.session?.user;
+        const extraHeaders: Record<string, string> = {};
+        if (token) {
+          extraHeaders["Authorization"] = `Bearer ${token}`;
+        }
+        if (user?.email) {
+          extraHeaders["x-user-email"] = user.email;
+        }
+        if (user?.user_metadata?.name) {
+          extraHeaders["x-user-name"] = user.user_metadata.name as string;
+        }
+        return extraHeaders;
       },
     }),
   ],
