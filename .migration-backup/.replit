@@ -1,0 +1,13 @@
+run = "pnpm start"
+entrypoint = "server/_core/index.ts"
+modules = ["nodejs-20", "web"]
+
+[deployment]
+run = ["pnpm", "start"]
+build = ["pnpm", "build"]
+
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
