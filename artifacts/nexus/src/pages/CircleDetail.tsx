@@ -17,8 +17,11 @@ import {
   UserPlus, Zap, Copy, Check, Share2,
   RefreshCw, ShieldAlert, Settings2, Save,
   Coffee, Music, Briefcase as BriefcaseIcon, Building, Trees, Home,
-  CalendarDays,
+  CalendarDays, Utensils, MapPin, Car, Cloud, Ban,
+  Footprints, Bike, Train, Volume2, VolumeX, Volume1,
+  Sun, Moon, Sunset, Sunrise,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import AvailabilityModal from "@/components/AvailabilityModal";
@@ -151,129 +154,502 @@ const VENUE_TYPE_OPTIONS: ChipOpt[] = [
   { value: "outdoor_activity", label: "Outdoor Activity", icon: <Home className="h-3.5 w-3.5" /> },
 ];
 
+// ─── Advanced Preferences option data ─────────────────────────────────────────
+const CUISINE_OPTIONS: ChipOpt[] = [
+  { value: "italian", label: "Italian" },
+  { value: "japanese", label: "Japanese" },
+  { value: "indian", label: "Indian" },
+  { value: "chinese", label: "Chinese" },
+  { value: "mexican", label: "Mexican" },
+  { value: "thai", label: "Thai" },
+  { value: "mediterranean", label: "Mediterranean" },
+  { value: "american", label: "American" },
+  { value: "french", label: "French" },
+  { value: "korean", label: "Korean" },
+  { value: "greek", label: "Greek" },
+  { value: "spanish", label: "Spanish" },
+];
+
+const FOOD_STYLE_OPTIONS: ChipOpt[] = [
+  { value: "full_meal", label: "Full Meal" },
+  { value: "drinks", label: "Drinks only" },
+  { value: "snacks", label: "Snacks & nibbles" },
+  { value: "brunch", label: "Brunch" },
+  { value: "dessert", label: "Dessert" },
+  { value: "buffet", label: "Buffet" },
+];
+
+const DIETARY_OPTIONS: ChipOpt[] = [
+  { value: "vegetarian", label: "Vegetarian" },
+  { value: "vegan", label: "Vegan" },
+  { value: "gluten_free", label: "Gluten-Free" },
+  { value: "halal", label: "Halal" },
+  { value: "kosher", label: "Kosher" },
+  { value: "dairy_free", label: "Dairy-Free" },
+  { value: "nut_free", label: "Nut-Free" },
+  { value: "pescatarian", label: "Pescatarian" },
+];
+
+const TRANSPORT_OPTIONS: ChipOpt[] = [
+  { value: "walking", label: "Walking", icon: <Footprints className="h-3.5 w-3.5" /> },
+  { value: "cycling", label: "Cycling", icon: <Bike className="h-3.5 w-3.5" /> },
+  { value: "public_transport", label: "Public transport", icon: <Train className="h-3.5 w-3.5" /> },
+  { value: "car", label: "Driving", icon: <Car className="h-3.5 w-3.5" /> },
+];
+
+const INDOOR_OUTDOOR_OPTIONS: ChipOpt[] = [
+  { value: "indoor", label: "Indoors", icon: <Building className="h-3.5 w-3.5" /> },
+  { value: "outdoor", label: "Outdoors", icon: <Trees className="h-3.5 w-3.5" /> },
+  { value: "both", label: "Either", icon: <Home className="h-3.5 w-3.5" /> },
+];
+
+const NOISE_OPTIONS: ChipOpt[] = [
+  { value: "quiet", label: "Quiet", icon: <VolumeX className="h-3.5 w-3.5" /> },
+  { value: "moderate", label: "Moderate", icon: <Volume1 className="h-3.5 w-3.5" /> },
+  { value: "lively", label: "Buzzy", icon: <Volume2 className="h-3.5 w-3.5" /> },
+];
+
+const TIME_OPTIONS: ChipOpt[] = [
+  { value: "morning", label: "Morning", icon: <Sunrise className="h-3.5 w-3.5" /> },
+  { value: "afternoon", label: "Afternoon", icon: <Sun className="h-3.5 w-3.5" /> },
+  { value: "evening", label: "Evening", icon: <Sunset className="h-3.5 w-3.5" /> },
+  { value: "late_night", label: "Late Night", icon: <Moon className="h-3.5 w-3.5" /> },
+];
+
+const DURATION_OPTIONS = [
+  { value: 60, label: "1 hr" },
+  { value: 90, label: "1.5 hrs" },
+  { value: 120, label: "2 hrs" },
+  { value: 180, label: "3 hrs" },
+  { value: 240, label: "4+ hrs" },
+];
+
+const MAX_TRAVEL_OPTIONS = [
+  { value: 10, label: "10 min" },
+  { value: 20, label: "20 min" },
+  { value: 30, label: "30 min" },
+  { value: 45, label: "45 min" },
+  { value: 60, label: "1 hour" },
+  { value: 90, label: "1.5 hrs" },
+];
+
+const PRIORITY_OPTIONS: ChipOpt[] = [
+  { value: "cheapest", label: "Lowest cost" },
+  { value: "shortest_travel", label: "Least travel" },
+  { value: "best_atmosphere", label: "Best atmosphere" },
+  { value: "highest_overlap", label: "Most attendance" },
+];
+
+const AVOID_VENUE_OPTIONS: ChipOpt[] = [
+  { value: "bars", label: "Bars & pubs" },
+  { value: "clubs", label: "Clubs" },
+  { value: "crowded", label: "Crowded" },
+  { value: "loud", label: "Loud" },
+  { value: "smoking", label: "Smoking areas" },
+];
+
+const ACCESSIBILITY_OPTIONS: ChipOpt[] = [
+  { value: "wheelchair", label: "Wheelchair" },
+  { value: "step_free", label: "Step-free" },
+  { value: "quiet_space", label: "Quiet space" },
+  { value: "hearing_loop", label: "Hearing loop" },
+  { value: "allergy_aware", label: "Allergy-aware" },
+];
+
+// ─── Toggle switch ─────────────────────────────────────────────────────────────
+function Toggle({ value, onChange, label, sub }: {
+  value: boolean; onChange: (v: boolean) => void; label: string; sub?: string;
+}) {
+  return (
+    <button type="button" onClick={() => onChange(!value)} className="flex items-center justify-between w-full gap-4 py-0.5">
+      <div className="text-left">
+        <p className="text-sm text-blue-100/80 font-medium">{label}</p>
+        {sub && <p className="text-xs text-blue-200/40 mt-0.5">{sub}</p>}
+      </div>
+      <motion.div
+        className={`relative w-10 h-[22px] rounded-full flex-shrink-0 transition-colors duration-150 ${
+          value ? "bg-amber-500/80 border border-amber-500/40" : "bg-blue-950 border border-blue-800/50"
+        }`}
+      >
+        <motion.div
+          className="absolute top-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm"
+          animate={{ left: value ? "calc(100% - 20px)" : "2px" }}
+          transition={{ type: "spring", stiffness: 500, damping: 35 }}
+        />
+      </motion.div>
+    </button>
+  );
+}
+
+// ─── Slider field ──────────────────────────────────────────────────────────────
+function SliderField({ label, value, min, max, onChange, leftLabel, rightLabel }: {
+  label: string; value: number; min: number; max: number;
+  onChange: (v: number) => void; leftLabel?: string; rightLabel?: string;
+}) {
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-blue-100/80 font-medium">{label}</p>
+      <div className="relative h-2 rounded-full bg-blue-950 border border-blue-900/50">
+        <motion.div
+          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-600 to-amber-400"
+          animate={{ width: `${pct}%` }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        />
+        <input
+          type="range" min={min} max={max} value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
+        />
+        <motion.div
+          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-amber-400 border-2 border-[#0a0a1a] pointer-events-none"
+          animate={{ left: `calc(${pct}% - 8px)` }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        />
+      </div>
+      {(leftLabel || rightLabel) && (
+        <div className="flex justify-between">
+          <span className="text-[10px] text-blue-200/30">{leftLabel}</span>
+          <span className="text-[10px] text-blue-200/30">{rightLabel}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Section header ────────────────────────────────────────────────────────────
+function PrefSection({ icon, title, children }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 pt-1">
+        <span className="text-amber-400">{icon}</span>
+        <p className="text-xs font-bold text-white uppercase tracking-widest">{title}</p>
+      </div>
+      <div className="space-y-3 pl-1">{children}</div>
+    </div>
+  );
+}
+
+function SubLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-[10px] font-semibold text-blue-200/30 uppercase tracking-widest mb-1.5">{children}</p>;
+}
+
+function PrefDivider() {
+  return <div className="border-t border-white/[0.04] my-1" />;
+}
+
 function CirclePreferencesPanel({
-  circleId,
-  isCreator,
+  circleId: _circleId,
 }: {
   circleId: string;
   isCreator: boolean;
 }) {
-  const utils = trpc.useUtils();
-  const { data: circlePrefs, isLoading } = trpc.circles.getPreferences.useQuery({ id: circleId });
-  const updateMutation = trpc.circles.updatePreferences.useMutation({
-    onSuccess: () => {
-      utils.circles.getPreferences.invalidate({ id: circleId });
-      setIsDirty(false);
-      setIsSaving(false);
-      toast.success("Circle preferences saved");
-    },
-    onError: (err) => {
-      setIsSaving(false);
-      toast.error(err.message || "Failed to save circle preferences");
-    },
+  const { data: prefs, isLoading } = trpc.calendar.getPreferences.useQuery();
+  const updateMutation = trpc.calendar.updatePreferences.useMutation({
+    onSuccess: () => { setIsDirty(false); setIsSaving(false); toast.success("Your preferences saved"); },
+    onError: (err: { message?: string }) => { setIsSaving(false); toast.error(err.message || "Failed to save"); },
   });
 
-  const [preferredArea, setPreferredArea] = useState("");
-  const [budgetRange, setBudgetRange] = useState<string[]>([]);
-  const [defaultVibe, setDefaultVibe] = useState<string[]>([]);
-  const [defaultVenueType, setDefaultVenueType] = useState<string[]>([]);
+  // ── Food & Drink ──
+  const [cuisines, setCuisines] = useState<string[]>([]);
+  const [foodPreferences, setFoodPreferences] = useState<string[]>([]);
+  const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
+  // ── Travel ──
+  const [maxTravelDistance, setMaxTravelDistance] = useState<number | null>(null);
+  const [transportType, setTransportType] = useState<string[]>([]);
+  const [midpointPreference, setMidpointPreference] = useState(false);
+  // ── Energy & Atmosphere ──
+  const [vibes, setVibes] = useState<string[]>([]);
+  const [noisePreference, setNoisePreference] = useState<string[]>([]);
+  const [energyLevel, setEnergyLevel] = useState(3);
+  const [indoorOutdoor, setIndoorOutdoor] = useState<string[]>([]);
+  // ── Scheduling ──
+  const [meetupTimes, setMeetupTimes] = useState<string[]>([]);
+  const [idealDuration, setIdealDuration] = useState<number | null>(null);
+  const [flexibilityLevel, setFlexibilityLevel] = useState(3);
+  // ── Weather ──
+  const [prefersSunny, setPrefersSunny] = useState(false);
+  const [avoidRain, setAvoidRain] = useState(false);
+  const [outdoorOnlyGoodWeather, setOutdoorOnlyGoodWeather] = useState(false);
+  // ── Group Priorities ──
+  const [prioritizeType, setPrioritizeType] = useState<string[]>([]);
+  const [budgetTier, setBudgetTier] = useState<string[]>([]);
+  // ── Exclusions ──
+  const [avoidVenues, setAvoidVenues] = useState<string[]>([]);
+  const [accessibilityNeeds, setAccessibilityNeeds] = useState<string[]>([]);
+
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (!circlePrefs) return;
-    setPreferredArea(circlePrefs.preferredArea ?? "");
-    setBudgetRange(circlePrefs.budgetRange ? [circlePrefs.budgetRange] : []);
-    setDefaultVibe(safeParseJSON(circlePrefs.defaultVibe));
-    setDefaultVenueType(safeParseJSON(circlePrefs.defaultVenueType));
-  }, [circlePrefs]);
+    if (!prefs) return;
+    setCuisines(safeParseJSON(prefs.cuisines));
+    setFoodPreferences(safeParseJSON(prefs.foodPreferences));
+    setDietaryRestrictions(safeParseJSON(prefs.dietaryRestrictions));
+    setMaxTravelDistance(prefs.maxTravelDistance ?? null);
+    setTransportType(prefs.transportType ? [prefs.transportType] : []);
+    setMidpointPreference(prefs.midpointPreference ?? false);
+    setVibes(safeParseJSON(prefs.vibes));
+    setNoisePreference(prefs.noisePreference ? [prefs.noisePreference] : []);
+    setEnergyLevel(prefs.energyLevel ?? 3);
+    setIndoorOutdoor(prefs.indoorOutdoor ? [prefs.indoorOutdoor] : []);
+    setMeetupTimes(safeParseJSON(prefs.meetupTimes));
+    setIdealDuration(prefs.idealDuration ?? null);
+    setFlexibilityLevel(prefs.flexibilityLevel ?? 3);
+    setPrefersSunny(prefs.prefersSunny ?? false);
+    setAvoidRain(prefs.avoidRain ?? false);
+    setOutdoorOnlyGoodWeather(prefs.outdoorOnlyGoodWeather ?? false);
+    setPrioritizeType(prefs.prioritizeType ? [prefs.prioritizeType] : []);
+    setBudgetTier(prefs.budgetTier ? [prefs.budgetTier] : []);
+    setAvoidVenues(safeParseJSON(prefs.avoidVenues));
+    setAccessibilityNeeds(safeParseJSON(prefs.accessibilityNeeds));
+  }, [prefs]);
 
-  function markDirty() { setIsDirty(true); }
+  function d<T>(setter: React.Dispatch<React.SetStateAction<T>>) {
+    return (v: T) => { setter(v); setIsDirty(true); };
+  }
 
   function handleSave() {
     setIsSaving(true);
     updateMutation.mutate({
-      id: circleId,
-      preferredArea: preferredArea || undefined,
-      budgetRange: budgetRange[0] as "£" | "££" | "£££" | undefined,
-      defaultVibe,
-      defaultVenueType,
+      cuisines,
+      foodPreferences,
+      dietaryRestrictions,
+      maxTravelDistance: maxTravelDistance ?? undefined,
+      transportType: transportType[0],
+      midpointPreference,
+      vibes,
+      noisePreference: noisePreference[0],
+      energyLevel,
+      indoorOutdoor: indoorOutdoor[0] as "indoor" | "outdoor" | "both" | undefined,
+      meetupTimes,
+      idealDuration: idealDuration ?? undefined,
+      flexibilityLevel,
+      prefersSunny,
+      avoidRain,
+      outdoorOnlyGoodWeather,
+      prioritizeType: prioritizeType[0],
+      budgetTier: budgetTier[0] as "£" | "££" | "£££" | undefined,
+      avoidVenues,
+      accessibilityNeeds,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 py-3">
-        <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
-        <span className="text-sm text-blue-200/40">Loading preferences…</span>
+      <div className="flex items-center gap-2 py-4">
+        <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+        <span className="text-sm text-blue-200/40">Loading your preferences…</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
-      {!isCreator && (
-        <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-900/30">
-          <p className="text-xs text-blue-200/50">Only the circle admin can edit these preferences.</p>
+    <div className="space-y-6">
+      <p className="text-xs text-blue-200/40 -mt-1">
+        These are your personal preferences — they power the Golden Window score across all your circles.
+      </p>
+
+      {/* ── 01 FOOD & DRINK ── */}
+      <PrefSection icon={<Utensils className="h-3.5 w-3.5" />} title="Food & Drink">
+        <div>
+          <SubLabel>Favourite cuisines</SubLabel>
+          <ChipGroup options={CUISINE_OPTIONS} selected={cuisines} onChange={d(setCuisines)} />
         </div>
-      )}
+        <PrefDivider />
+        <div>
+          <SubLabel>Food style</SubLabel>
+          <ChipGroup options={FOOD_STYLE_OPTIONS} selected={foodPreferences} onChange={d(setFoodPreferences)} />
+        </div>
+        <PrefDivider />
+        <div>
+          <SubLabel>Dietary requirements</SubLabel>
+          <ChipGroup options={DIETARY_OPTIONS} selected={dietaryRestrictions} onChange={d(setDietaryRestrictions)} />
+        </div>
+      </PrefSection>
 
-      {/* Preferred area */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-amber-400/70 uppercase tracking-wider">Preferred Area / Neighbourhood</p>
-        <Input
-          value={preferredArea}
-          onChange={(e) => { setPreferredArea(e.target.value); markDirty(); }}
-          placeholder="e.g., Shoreditch, Central London…"
-          disabled={!isCreator}
-          className="bg-blue-950/40 border-blue-900/40 text-white placeholder:text-blue-200/30 disabled:opacity-50"
+      <PrefDivider />
+
+      {/* ── 02 TRAVEL & DISTANCE ── */}
+      <PrefSection icon={<MapPin className="h-3.5 w-3.5" />} title="Travel & Distance">
+        <div>
+          <SubLabel>Max travel time</SubLabel>
+          <div className="flex flex-wrap gap-2">
+            {MAX_TRAVEL_OPTIONS.map((opt) => {
+              const active = maxTravelDistance === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => { setMaxTravelDistance(active ? null : opt.value); setIsDirty(true); }}
+                  className={`flex items-center px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                    active
+                      ? "bg-amber-500/20 border-amber-500/60 text-amber-300"
+                      : "bg-blue-950/40 border-blue-900/40 text-blue-200/60 hover:border-blue-700/60 hover:text-blue-200/90"
+                  }`}
+                >
+                  {opt.label}
+                  {active && <Check className="h-3 w-3 ml-1.5 text-amber-400" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <PrefDivider />
+        <div>
+          <SubLabel>How you travel</SubLabel>
+          <ChipGroup options={TRANSPORT_OPTIONS} selected={transportType} onChange={d(setTransportType)} multi={false} />
+        </div>
+        <PrefDivider />
+        <Toggle
+          value={midpointPreference}
+          onChange={d(setMidpointPreference)}
+          label="Prefer midpoint venues"
+          sub="Suggest locations equidistant from all members"
         />
-      </div>
+      </PrefSection>
 
-      {/* Budget range */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-amber-400/70 uppercase tracking-wider">Circle Budget</p>
-        <ChipGroup
-          options={BUDGET_OPTIONS}
-          selected={budgetRange}
-          onChange={(v) => { if (isCreator) { setBudgetRange(v); markDirty(); } }}
-          multi={false}
+      <PrefDivider />
+
+      {/* ── 03 ENERGY & ATMOSPHERE ── */}
+      <PrefSection icon={<Zap className="h-3.5 w-3.5" />} title="Energy & Atmosphere">
+        <div>
+          <SubLabel>Vibe</SubLabel>
+          <ChipGroup options={VIBE_OPTIONS} selected={vibes} onChange={d(setVibes)} />
+        </div>
+        <PrefDivider />
+        <SliderField
+          label="Social energy"
+          value={energyLevel} min={1} max={5}
+          onChange={d(setEnergyLevel)}
+          leftLabel="Chill & relaxed"
+          rightLabel="High energy"
         />
-      </div>
+        <PrefDivider />
+        <div>
+          <SubLabel>Noise level</SubLabel>
+          <ChipGroup options={NOISE_OPTIONS} selected={noisePreference} onChange={d(setNoisePreference)} multi={false} />
+        </div>
+        <PrefDivider />
+        <div>
+          <SubLabel>Venue setting</SubLabel>
+          <ChipGroup options={INDOOR_OUTDOOR_OPTIONS} selected={indoorOutdoor} onChange={d(setIndoorOutdoor)} multi={false} />
+        </div>
+      </PrefSection>
 
-      {/* Default vibe */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-amber-400/70 uppercase tracking-wider">Default Vibe</p>
-        <ChipGroup
-          options={VIBE_OPTIONS}
-          selected={defaultVibe}
-          onChange={(v) => { if (isCreator) { setDefaultVibe(v); markDirty(); } }}
+      <PrefDivider />
+
+      {/* ── 04 SCHEDULING ── */}
+      <PrefSection icon={<CalendarDays className="h-3.5 w-3.5" />} title="Scheduling">
+        <div>
+          <SubLabel>Preferred times</SubLabel>
+          <ChipGroup options={TIME_OPTIONS} selected={meetupTimes} onChange={d(setMeetupTimes)} />
+        </div>
+        <PrefDivider />
+        <div>
+          <SubLabel>Ideal length</SubLabel>
+          <div className="flex flex-wrap gap-2">
+            {DURATION_OPTIONS.map((opt) => {
+              const active = idealDuration === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => { setIdealDuration(active ? null : opt.value); setIsDirty(true); }}
+                  className={`flex items-center px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                    active
+                      ? "bg-amber-500/20 border-amber-500/60 text-amber-300"
+                      : "bg-blue-950/40 border-blue-900/40 text-blue-200/60 hover:border-blue-700/60 hover:text-blue-200/90"
+                  }`}
+                >
+                  {opt.label}
+                  {active && <Check className="h-3 w-3 ml-1.5 text-amber-400" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <PrefDivider />
+        <SliderField
+          label="Scheduling flexibility"
+          value={flexibilityLevel} min={1} max={5}
+          onChange={d(setFlexibilityLevel)}
+          leftLabel="Very strict"
+          rightLabel="Very flexible"
         />
-      </div>
+      </PrefSection>
 
-      {/* Venue type */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-amber-400/70 uppercase tracking-wider">Preferred Venue Types</p>
-        <ChipGroup
-          options={VENUE_TYPE_OPTIONS}
-          selected={defaultVenueType}
-          onChange={(v) => { if (isCreator) { setDefaultVenueType(v); markDirty(); } }}
-        />
-      </div>
+      <PrefDivider />
 
-      {isCreator && isDirty && (
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="w-full bg-amber-500 hover:bg-amber-400 text-[#0a0a1a] font-semibold rounded-xl"
-        >
-          {isSaving ? (
-            <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</>
-          ) : (
-            <><Save className="h-4 w-4 mr-2" />Save Circle Preferences</>
-          )}
-        </Button>
-      )}
+      {/* ── 05 WEATHER ── */}
+      <PrefSection icon={<Cloud className="h-3.5 w-3.5" />} title="Weather">
+        <div className="space-y-4">
+          <Toggle value={prefersSunny} onChange={d(setPrefersSunny)} label="Prefer sunny weather" />
+          <PrefDivider />
+          <Toggle value={avoidRain} onChange={d(setAvoidRain)} label="Avoid rainy days" />
+          <PrefDivider />
+          <Toggle
+            value={outdoorOnlyGoodWeather}
+            onChange={d(setOutdoorOnlyGoodWeather)}
+            label="Outdoors only in good weather"
+          />
+        </div>
+      </PrefSection>
+
+      <PrefDivider />
+
+      {/* ── 06 GROUP PRIORITIES ── */}
+      <PrefSection icon={<Users className="h-3.5 w-3.5" />} title="Group Priorities">
+        <div>
+          <SubLabel>Prioritise</SubLabel>
+          <ChipGroup options={PRIORITY_OPTIONS} selected={prioritizeType} onChange={d(setPrioritizeType)} multi={false} />
+        </div>
+        <PrefDivider />
+        <div>
+          <SubLabel>Budget comfort zone</SubLabel>
+          <ChipGroup options={BUDGET_OPTIONS} selected={budgetTier} onChange={d(setBudgetTier)} multi={false} />
+        </div>
+      </PrefSection>
+
+      <PrefDivider />
+
+      {/* ── 07 EXCLUSIONS ── */}
+      <PrefSection icon={<Ban className="h-3.5 w-3.5" />} title="Exclusions">
+        <div>
+          <SubLabel>Avoid venue types</SubLabel>
+          <ChipGroup options={AVOID_VENUE_OPTIONS} selected={avoidVenues} onChange={d(setAvoidVenues)} />
+        </div>
+        <PrefDivider />
+        <div>
+          <SubLabel>Accessibility needs</SubLabel>
+          <ChipGroup options={ACCESSIBILITY_OPTIONS} selected={accessibilityNeeds} onChange={d(setAccessibilityNeeds)} />
+        </div>
+      </PrefSection>
+
+      {/* Save button */}
+      <AnimatePresence>
+        {isDirty && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+          >
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full bg-amber-500 hover:bg-amber-400 text-[#0a0a1a] font-bold rounded-xl"
+            >
+              {isSaving
+                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</>
+                : <><Save className="h-4 w-4 mr-2" />Save Preferences</>
+              }
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
