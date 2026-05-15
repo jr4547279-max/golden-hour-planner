@@ -81,8 +81,13 @@ export const userPreferences = pgTable(
     maxTravelDistance: integer("maxTravelDistance"),
     cuisines: text("cuisines"),
     dietaryRestrictions: text("dietaryRestrictions"),
+    foodPreferences: text("foodPreferences"),
     preferredDays: text("preferredDays"),
+    meetupTimes: text("meetupTimes"),
     vibes: text("vibes"),
+    transportType: varchar("transportType", { length: 32 }),
+    indoorOutdoor: varchar("indoorOutdoor", { length: 16 }),
+    budgetTier: varchar("budgetTier", { length: 8 }),
     homeLat: varchar("homeLat", { length: 32 }),
     homeLng: varchar("homeLng", { length: 32 }),
     timezone: varchar("timezone", { length: 64 }),
@@ -160,3 +165,20 @@ export const circleInvites = pgTable(
 
 export type CircleInvite = typeof circleInvites.$inferSelect;
 export type InsertCircleInvite = typeof circleInvites.$inferInsert;
+
+export const circlePreferences = pgTable(
+  "circle_preferences",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    circleId: varchar("circleId", { length: 36 }).notNull().unique(),
+    preferredArea: text("preferredArea"),
+    budgetRange: varchar("budgetRange", { length: 8 }),
+    defaultVibe: text("defaultVibe"),
+    defaultVenueType: text("defaultVenueType"),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  },
+  (table) => [index("circle_preferences_circleId_idx").on(table.circleId)]
+);
+
+export type CirclePreference = typeof circlePreferences.$inferSelect;
+export type InsertCirclePreference = typeof circlePreferences.$inferInsert;

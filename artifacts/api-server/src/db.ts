@@ -1,5 +1,5 @@
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { db, users, calendarConnections, availabilityWindows, userPreferences, groups, groupMembers, circleInvites } from "@workspace/db";
+import { db, users, calendarConnections, availabilityWindows, userPreferences, groups, groupMembers, circleInvites, circlePreferences } from "@workspace/db";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -140,6 +140,25 @@ export async function upsertUserPreferences(
     await db.update(userPreferences).set({ ...data, updatedAt: new Date() }).where(eq(userPreferences.userId, userId));
   } else {
     await db.insert(userPreferences).values({ id: nanoid(36), userId, ...data });
+  }
+}
+
+// ─── Circle Preferences ───────────────────────────────────────────────────────
+
+export async function getCirclePreferences(circleId: string) {
+  const result = await db.select().from(circlePreferences).where(eq(circlePreferences.circleId, circleId)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function upsertCirclePreferences(
+  circleId: string,
+  data: Partial<InferInsertModel<typeof circlePreferences>>
+): Promise<void> {
+  const existing = await getCirclePreferences(circleId);
+  if (existing) {
+    await db.update(circlePreferences).set({ ...data, updatedAt: new Date() }).where(eq(circlePreferences.circleId, circleId));
+  } else {
+    await db.insert(circlePreferences).values({ id: nanoid(36), circleId, ...data });
   }
 }
 

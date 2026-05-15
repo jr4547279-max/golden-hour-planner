@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,8 @@ import {
   ArrowLeft, Loader2, Users, Calendar, Sparkles,
   Heart, Briefcase, Star, Users2, Crown,
   UserPlus, Zap, Copy, Check, Share2,
-  RefreshCw, ShieldAlert,
+  RefreshCw, ShieldAlert, Settings2, Save,
+  Coffee, Music, Briefcase as BriefcaseIcon, Building, Trees, Home,
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
@@ -74,6 +75,203 @@ function MemberAvatar({ name, email, role }: { name: string | null; email: strin
   return (
     <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center flex-shrink-0`}>
       <span className="text-xs font-bold text-white">{initials(name, email)}</span>
+    </div>
+  );
+}
+
+function safeParseJSON(val: string | null | undefined): string[] {
+  if (!val) return [];
+  try { return JSON.parse(val); } catch { return []; }
+}
+
+type ChipOpt = { value: string; label: string; icon?: React.ReactNode };
+
+function ChipGroup({
+  options, selected, onChange, multi = true,
+}: {
+  options: ChipOpt[];
+  selected: string[];
+  onChange: (v: string[]) => void;
+  multi?: boolean;
+}) {
+  function toggle(val: string) {
+    if (multi) {
+      onChange(selected.includes(val) ? selected.filter((v) => v !== val) : [...selected, val]);
+    } else {
+      onChange(selected.includes(val) ? [] : [val]);
+    }
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => {
+        const active = selected.includes(opt.value);
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => toggle(opt.value)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all duration-150 ${
+              active
+                ? "bg-amber-500/20 border-amber-500/60 text-amber-300"
+                : "bg-blue-950/40 border-blue-900/40 text-blue-200/60 hover:border-blue-700/60 hover:text-blue-200/90"
+            }`}
+          >
+            {opt.icon && <span className="h-3.5 w-3.5 flex-shrink-0">{opt.icon}</span>}
+            {opt.label}
+            {active && <Check className="h-3 w-3 ml-0.5 text-amber-400" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const VIBE_OPTIONS: ChipOpt[] = [
+  { value: "chill", label: "Chill", icon: <Coffee className="h-3.5 w-3.5" /> },
+  { value: "lively", label: "Lively", icon: <Music className="h-3.5 w-3.5" /> },
+  { value: "productive", label: "Productive", icon: <BriefcaseIcon className="h-3.5 w-3.5" /> },
+  { value: "romantic", label: "Romantic", icon: <Heart className="h-3.5 w-3.5" /> },
+  { value: "adventurous", label: "Adventurous", icon: <Zap className="h-3.5 w-3.5" /> },
+];
+
+const BUDGET_OPTIONS: ChipOpt[] = [
+  { value: "£", label: "£ — Budget" },
+  { value: "££", label: "££ — Mid-range" },
+  { value: "£££", label: "£££ — Premium" },
+];
+
+const VENUE_TYPE_OPTIONS: ChipOpt[] = [
+  { value: "restaurant", label: "Restaurant", icon: <Coffee className="h-3.5 w-3.5" /> },
+  { value: "bar", label: "Bar / Pub", icon: <Music className="h-3.5 w-3.5" /> },
+  { value: "cafe", label: "Café", icon: <Coffee className="h-3.5 w-3.5" /> },
+  { value: "park", label: "Park", icon: <Trees className="h-3.5 w-3.5" /> },
+  { value: "indoor_activity", label: "Indoor Activity", icon: <Building className="h-3.5 w-3.5" /> },
+  { value: "outdoor_activity", label: "Outdoor Activity", icon: <Home className="h-3.5 w-3.5" /> },
+];
+
+function CirclePreferencesPanel({
+  circleId,
+  isCreator,
+}: {
+  circleId: string;
+  isCreator: boolean;
+}) {
+  const utils = trpc.useUtils();
+  const { data: circlePrefs, isLoading } = trpc.circles.getPreferences.useQuery({ id: circleId });
+  const updateMutation = trpc.circles.updatePreferences.useMutation({
+    onSuccess: () => {
+      utils.circles.getPreferences.invalidate({ id: circleId });
+      setIsDirty(false);
+      setIsSaving(false);
+      toast.success("Circle preferences saved");
+    },
+    onError: (err) => {
+      setIsSaving(false);
+      toast.error(err.message || "Failed to save circle preferences");
+    },
+  });
+
+  const [preferredArea, setPreferredArea] = useState("");
+  const [budgetRange, setBudgetRange] = useState<string[]>([]);
+  const [defaultVibe, setDefaultVibe] = useState<string[]>([]);
+  const [defaultVenueType, setDefaultVenueType] = useState<string[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!circlePrefs) return;
+    setPreferredArea(circlePrefs.preferredArea ?? "");
+    setBudgetRange(circlePrefs.budgetRange ? [circlePrefs.budgetRange] : []);
+    setDefaultVibe(safeParseJSON(circlePrefs.defaultVibe));
+    setDefaultVenueType(safeParseJSON(circlePrefs.defaultVenueType));
+  }, [circlePrefs]);
+
+  function markDirty() { setIsDirty(true); }
+
+  function handleSave() {
+    setIsSaving(true);
+    updateMutation.mutate({
+      id: circleId,
+      preferredArea: preferredArea || undefined,
+      budgetRange: budgetRange[0] as "£" | "££" | "£££" | undefined,
+      defaultVibe,
+      defaultVenueType,
+    });
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 py-3">
+        <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+        <span className="text-sm text-blue-200/40">Loading preferences…</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {!isCreator && (
+        <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-900/30">
+          <p className="text-xs text-blue-200/50">Only the circle admin can edit these preferences.</p>
+        </div>
+      )}
+
+      {/* Preferred area */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-amber-400/70 uppercase tracking-wider">Preferred Area / Neighbourhood</p>
+        <Input
+          value={preferredArea}
+          onChange={(e) => { setPreferredArea(e.target.value); markDirty(); }}
+          placeholder="e.g., Shoreditch, Central London…"
+          disabled={!isCreator}
+          className="bg-blue-950/40 border-blue-900/40 text-white placeholder:text-blue-200/30 disabled:opacity-50"
+        />
+      </div>
+
+      {/* Budget range */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-amber-400/70 uppercase tracking-wider">Circle Budget</p>
+        <ChipGroup
+          options={BUDGET_OPTIONS}
+          selected={budgetRange}
+          onChange={(v) => { if (isCreator) { setBudgetRange(v); markDirty(); } }}
+          multi={false}
+        />
+      </div>
+
+      {/* Default vibe */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-amber-400/70 uppercase tracking-wider">Default Vibe</p>
+        <ChipGroup
+          options={VIBE_OPTIONS}
+          selected={defaultVibe}
+          onChange={(v) => { if (isCreator) { setDefaultVibe(v); markDirty(); } }}
+        />
+      </div>
+
+      {/* Venue type */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-amber-400/70 uppercase tracking-wider">Preferred Venue Types</p>
+        <ChipGroup
+          options={VENUE_TYPE_OPTIONS}
+          selected={defaultVenueType}
+          onChange={(v) => { if (isCreator) { setDefaultVenueType(v); markDirty(); } }}
+        />
+      </div>
+
+      {isCreator && isDirty && (
+        <Button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full bg-amber-500 hover:bg-amber-400 text-[#0a0a1a] font-semibold rounded-xl"
+        >
+          {isSaving ? (
+            <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</>
+          ) : (
+            <><Save className="h-4 w-4 mr-2" />Save Circle Preferences</>
+          )}
+        </Button>
+      )}
     </div>
   );
 }
@@ -234,6 +432,7 @@ export default function CircleDetail() {
   const params = useParams<{ id: string }>();
   const circleId = params.id;
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [prefsOpen, setPrefsOpen] = useState(false);
 
   const { data: circle, isLoading, error } = trpc.circles.getById.useQuery(
     { id: circleId ?? "" },
@@ -387,6 +586,50 @@ export default function CircleDetail() {
             </Card>
           </div>
         )}
+
+        {/* Circle Preferences section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm font-semibold text-blue-200/50 uppercase tracking-wider">
+              Circle Preferences
+            </h2>
+            <button
+              onClick={() => setPrefsOpen(!prefsOpen)}
+              className="flex items-center gap-1.5 text-xs text-blue-400/60 hover:text-blue-300/90 transition-colors"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              {prefsOpen ? "Collapse" : "Expand"}
+            </button>
+          </div>
+
+          {prefsOpen ? (
+            <Card className="border-blue-900/30 bg-[#11112b]/60">
+              <CardContent className="p-5">
+                <CirclePreferencesPanel circleId={circleId} isCreator={isCreator} />
+              </CardContent>
+            </Card>
+          ) : (
+            <button
+              onClick={() => setPrefsOpen(true)}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border border-blue-900/40 bg-[#11112b]/60 hover:bg-[#11112b] hover:border-blue-700/50 transition-all text-left group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-amber-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-800/40 transition-colors">
+                <Settings2 className="h-5 w-5 text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-white">
+                  {isCreator ? "Configure Circle Preferences" : "View Circle Preferences"}
+                </div>
+                <div className="text-xs text-blue-200/40">
+                  {isCreator
+                    ? "Set default vibe, budget, area and venue type for this circle"
+                    : "Preferred vibe, budget, area and venue type for this circle"}
+                </div>
+              </div>
+              <Settings2 className="h-4 w-4 text-blue-400/40 group-hover:text-blue-300/60 transition-colors flex-shrink-0" />
+            </button>
+          )}
+        </div>
 
         {/* Action buttons */}
         <div className="space-y-3">

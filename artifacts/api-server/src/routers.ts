@@ -204,6 +204,43 @@ export const appRouter = router({
         const token = await db.regenerateInviteToken(input.id);
         return { success: true, inviteToken: token };
       }),
+
+    getPreferences: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const isMember = await db.isCircleMember(input.id, ctx.user.id);
+        if (!isMember) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this circle" });
+        }
+        return db.getCirclePreferences(input.id);
+      }),
+
+    updatePreferences: protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          preferredArea: z.string().max(200).optional(),
+          budgetRange: z.enum(["£", "££", "£££"]).optional(),
+          defaultVibe: z.array(z.string()).optional(),
+          defaultVenueType: z.array(z.string()).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const circle = await db.getCircleById(input.id);
+        if (!circle) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Circle not found" });
+        }
+        if (circle.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the circle admin can update circle preferences" });
+        }
+        await db.upsertCirclePreferences(input.id, {
+          preferredArea: input.preferredArea,
+          budgetRange: input.budgetRange,
+          defaultVibe: input.defaultVibe ? JSON.stringify(input.defaultVibe) : undefined,
+          defaultVenueType: input.defaultVenueType ? JSON.stringify(input.defaultVenueType) : undefined,
+        });
+        return { success: true };
+      }),
   }),
 
   calendar: router({
@@ -283,7 +320,12 @@ export const appRouter = router({
           vibes: z.array(z.string()).optional(),
           cuisines: z.array(z.string()).optional(),
           dietaryRestrictions: z.array(z.string()).optional(),
+          foodPreferences: z.array(z.string()).optional(),
           preferredDays: z.array(z.string()).optional(),
+          meetupTimes: z.array(z.string()).optional(),
+          transportType: z.string().optional(),
+          indoorOutdoor: z.enum(["indoor", "outdoor", "both"]).optional(),
+          budgetTier: z.enum(["£", "££", "£££"]).optional(),
           homeLat: z.string().optional(),
           homeLng: z.string().optional(),
           timezone: z.string().optional(),
@@ -298,7 +340,12 @@ export const appRouter = router({
           dietaryRestrictions: input.dietaryRestrictions
             ? JSON.stringify(input.dietaryRestrictions)
             : undefined,
+          foodPreferences: input.foodPreferences ? JSON.stringify(input.foodPreferences) : undefined,
           preferredDays: input.preferredDays ? JSON.stringify(input.preferredDays) : undefined,
+          meetupTimes: input.meetupTimes ? JSON.stringify(input.meetupTimes) : undefined,
+          transportType: input.transportType,
+          indoorOutdoor: input.indoorOutdoor,
+          budgetTier: input.budgetTier,
           homeLat: input.homeLat,
           homeLng: input.homeLng,
           timezone: input.timezone,
