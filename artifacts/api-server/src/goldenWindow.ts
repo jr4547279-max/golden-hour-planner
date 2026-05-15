@@ -175,6 +175,8 @@ export interface GoldenWindowResult {
   suggestedFoodType: string | null;
   travelFit: string | null;
   dietaryNote: string | null;
+  indoorOutdoorSummary: string | null;
+  transportSummary: string | null;
   // Labels
   vibeLabel: string | null;
   venueLabel: string | null;
@@ -381,11 +383,16 @@ function inferFoodType(memberPrefs: MemberPrefs[], availableUserIds: number[]): 
 
 function buildExplanation(
   result: Omit<GoldenWindowResult, "explanation" | "explanationPoints">,
-  breakdown: ScoreBreakdown
+  breakdown: ScoreBreakdown,
+  memberPrefs: MemberPrefs[],
+  availableUserIds: number[],
+  timeSlot: TimeSlot,
 ): { explanation: string; explanationPoints: string[] } {
   const points: string[] = [];
+  const relevantPrefs = memberPrefs.filter((p) => availableUserIds.includes(p.userId));
+  const total = Math.max(relevantPrefs.length, 1);
 
-  // Attendance
+  // 1 — Attendance
   const attendanceRatio = result.availableCount / Math.max(result.totalMembers, 1);
   if (attendanceRatio === 1) {
     points.push(`All ${result.totalMembers} members are free`);
@@ -393,34 +400,100 @@ function buildExplanation(
     points.push(`${result.availableCount} of ${result.totalMembers} members available`);
   }
 
-  // Vibe
-  if (breakdown.vibe >= W.vibe * 0.8 && result.vibeLabel) {
-    points.push(`Strong "${result.vibeLabel}" vibe consensus`);
-  } else if (result.vibeLabel) {
-    points.push(`"${result.vibeLabel}" vibe is most popular`);
+  // 2 — Time preference overlap
+  const withTimePref = relevantPrefs.filter((p) => p.meetupTimes.length > 0);
+  if (withTimePref.length > 0) {
+    const agreeing = withTimePref.filter((p) => p.meetupTimes.includes(timeSlot)).length;
+    const timePct = Math.round((agreeing / withTimePref.length) * 100);
+    const timeLabel = TIME_SLOT_LABELS[timeSlot];
+    if (timePct === 100) {
+      points.push(`${timeLabel} is the preferred time slot for all members`);
+    } else if (timePct >= 60) {
+      points.push(`${timeLabel} availability had the strongest overlap`);
+    } else if (timePct > 0) {
+      points.push(`${agreeing} of ${withTimePref.length} members prefer ${timeLabel}`);
+    }
   }
 
-  // Cuisine
+  // 3 — Vibe
+  if (result.vibeLabel) {
+    const vibeCount = relevantPrefs.filter(
+      (p) => p.vibes.length === 0 || p.vibes.includes(result.suggestedVibe ?? "")
+    ).length;
+    const vibePct = Math.round((vibeCount / total) * 100);
+    if (vibePct === 100) {
+      points.push(`Everyone prefers a ${result.vibeLabel} atmosphere`);
+    } else if (breakdown.vibe >= W.vibe * 0.8) {
+      points.push(`Most members prefer a ${result.vibeLabel} atmosphere`);
+    } else {
+      points.push(`"${result.vibeLabel}" is the top vibe preference`);
+    }
+  }
+
+  // 4 — Indoor / outdoor
+  const indoorCount = relevantPrefs.filter((p) => p.indoorOutdoor === "indoor").length;
+  const outdoorCount = relevantPrefs.filter((p) => p.indoorOutdoor === "outdoor").length;
+  const withIoPref = indoorCount + outdoorCount;
+  if (withIoPref > 0) {
+    if (indoorCount > outdoorCount) {
+      const pct = Math.round((indoorCount / total) * 100);
+      points.push(
+        pct === 100
+          ? "All members prefer lively indoor venues"
+          : `${pct >= 70 ? "Most" : "More"} members prefer indoor venues`
+      );
+    } else if (outdoorCount > indoorCount) {
+      const pct = Math.round((outdoorCount / total) * 100);
+      points.push(
+        pct === 100
+          ? "All members prefer outdoor settings"
+          : `${pct >= 70 ? "Most" : "More"} members prefer outdoor settings`
+      );
+    } else {
+      points.push("Mixed indoor/outdoor preference — a flexible venue works best");
+    }
+  }
+
+  // 5 — Cuisine
   if (result.suggestedCuisines.length > 0) {
     const cuisineNames = result.suggestedCuisines
       .map((c) => CUISINE_LABELS[c] ?? c)
-      .join(" & ");
-    points.push(`Cuisine match: ${cuisineNames}`);
+      .join(" and ");
+    if (breakdown.cuisine >= W.cuisine * 0.7) {
+      points.push(`${cuisineNames} scored highest across the group`);
+    } else {
+      points.push(`${cuisineNames} is the top cuisine preference`);
+    }
   }
 
-  // Dietary
+  // 6 — Transport / travel
+  const withTransport = relevantPrefs.filter((p) => p.transportType);
+  if (withTransport.length > 0) {
+    const types = withTransport.map((p) => p.transportType!);
+    const tTotal = types.length;
+    const publicPct = Math.round((types.filter((t) => t === "public_transport").length / tTotal) * 100);
+    const walkPct   = Math.round((types.filter((t) => ["walking", "cycling"].includes(t)).length / tTotal) * 100);
+    const drivePct  = Math.round((types.filter((t) => t === "car").length / tTotal) * 100);
+
+    if (walkPct >= 60) {
+      points.push(`${walkPct}% of members can walk or cycle — a nearby venue is ideal`);
+    } else if (publicPct >= 50) {
+      points.push("Most members travel by public transport — a central location works best");
+    } else if (drivePct >= 60) {
+      points.push("Most members drive — venue with parking preferred");
+    } else {
+      points.push("All members are within their preferred travel range");
+    }
+  }
+
+  // 7 — Budget (only when strong agreement)
+  if (result.suggestedBudget && breakdown.budget >= W.budget * 0.7) {
+    points.push(`${result.suggestedBudget} budget range agreed by the group`);
+  }
+
+  // 8 — Dietary (when present)
   if (result.dietaryNote) {
     points.push(result.dietaryNote);
-  }
-
-  // Travel
-  if (result.travelFit) {
-    points.push(result.travelFit);
-  }
-
-  // Budget
-  if (result.suggestedBudget && breakdown.budget >= W.budget * 0.7) {
-    points.push(`Budget: ${result.suggestedBudget} range agreed`);
   }
 
   // Build short headline
@@ -431,7 +504,7 @@ function buildExplanation(
     : "";
   const explanation = `${attendanceText}${vibeText}${cuisineText}`;
 
-  return { explanation, explanationPoints: points.slice(0, 4) };
+  return { explanation, explanationPoints: points.slice(0, 6) };
 }
 
 // ─── Main Engine ──────────────────────────────────────────────────────────────
@@ -492,6 +565,37 @@ export function calculateGoldenWindows(
       const travelFit = inferTravelFit(memberPrefs, availableIds);
       const suggestedFoodType = inferFoodType(memberPrefs, availableIds);
 
+      // Indoor / outdoor summary tag
+      const ioRelevant = memberPrefs.filter((p) => availableIds.includes(p.userId));
+      const ioTotal = Math.max(ioRelevant.length, 1);
+      const indoorN = ioRelevant.filter((p) => p.indoorOutdoor === "indoor").length;
+      const outdoorN = ioRelevant.filter((p) => p.indoorOutdoor === "outdoor").length;
+      let indoorOutdoorSummary: string | null = null;
+      if (indoorN + outdoorN > 0) {
+        if (indoorN > outdoorN) {
+          indoorOutdoorSummary = indoorN === ioTotal ? "Indoor preferred" : `${Math.round(indoorN / ioTotal * 100)}% indoor`;
+        } else if (outdoorN > indoorN) {
+          indoorOutdoorSummary = outdoorN === ioTotal ? "Outdoor preferred" : `${Math.round(outdoorN / ioTotal * 100)}% outdoor`;
+        } else {
+          indoorOutdoorSummary = "Indoor / Outdoor mix";
+        }
+      }
+
+      // Transport summary tag
+      const withTransport = ioRelevant.filter((p) => p.transportType);
+      let transportSummary: string | null = null;
+      if (withTransport.length > 0) {
+        const types = withTransport.map((p) => p.transportType!);
+        const tTotal = types.length;
+        const publicN  = types.filter((t) => t === "public_transport").length;
+        const walkN    = types.filter((t) => ["walking", "cycling"].includes(t)).length;
+        const driveN   = types.filter((t) => t === "car").length;
+        if (walkN / tTotal >= 0.6)        transportSummary = "Walk / Cycle";
+        else if (publicN / tTotal >= 0.5) transportSummary = "Public Transport";
+        else if (driveN / tTotal >= 0.6)  transportSummary = "Driving";
+        else                               transportSummary = "Mixed transport";
+      }
+
       const partial: Omit<GoldenWindowResult, "explanation" | "explanationPoints"> = {
         day,
         timeSlot,
@@ -507,12 +611,14 @@ export function calculateGoldenWindows(
         suggestedFoodType,
         travelFit,
         dietaryNote,
+        indoorOutdoorSummary,
+        transportSummary,
         vibeLabel: vibeWinner ? (VIBE_LABELS[vibeWinner] ?? vibeWinner) : null,
         venueLabel: venueType ? (VENUE_LABELS[venueType] ?? venueType) : null,
         vibeEmoji: vibeWinner ? (VIBE_EMOJIS[vibeWinner] ?? null) : null,
       };
 
-      const { explanation, explanationPoints } = buildExplanation(partial, breakdown);
+      const { explanation, explanationPoints } = buildExplanation(partial, breakdown, memberPrefs, availableIds, timeSlot);
 
       results.push({ ...partial, explanation, explanationPoints });
     }

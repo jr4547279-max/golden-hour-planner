@@ -36,12 +36,22 @@ interface GoldenWindowResult {
   suggestedFoodType: string | null;
   travelFit: string | null;
   dietaryNote: string | null;
+  indoorOutdoorSummary: string | null;
+  transportSummary: string | null;
   vibeLabel: string | null;
   venueLabel: string | null;
   vibeEmoji: string | null;
   explanation: string;
   explanationPoints: string[];
 }
+
+// ─── Cuisine label map (mirrors engine) ───────────────────────────────────────
+const CUISINE_LABELS: Record<string, string> = {
+  italian: "Italian", japanese: "Japanese", mexican: "Mexican",
+  indian: "Indian", chinese: "Chinese", thai: "Thai",
+  mediterranean: "Mediterranean", american: "American", french: "French",
+  british: "British", greek: "Greek", korean: "Korean", spanish: "Spanish",
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TIME_LABELS: Record<string, string> = {
@@ -245,19 +255,22 @@ function ResultCard({ result, rank, delay }: {
           {result.venueLabel && (
             <Tag variant="blue">{result.venueLabel}</Tag>
           )}
+          {result.indoorOutdoorSummary && (
+            <Tag variant="blue">🏠 {result.indoorOutdoorSummary}</Tag>
+          )}
           {result.suggestedBudget && (
             <Tag variant="green">{result.suggestedBudget}</Tag>
           )}
           {result.suggestedCuisines.slice(0, 2).map((c) => (
             <Tag key={c} variant="purple">
-              {c.charAt(0).toUpperCase() + c.slice(1)}
+              {CUISINE_LABELS[c] ?? c.charAt(0).toUpperCase() + c.slice(1)}
             </Tag>
           ))}
           {result.suggestedFoodType && (
             <Tag variant="blue">{result.suggestedFoodType}</Tag>
           )}
-          {result.travelFit && (
-            <Tag variant="blue">🚌 {result.travelFit}</Tag>
+          {result.transportSummary && (
+            <Tag variant="blue">🚌 {result.transportSummary}</Tag>
           )}
           {result.dietaryNote && (
             <Tag variant="red">⚠ {result.dietaryNote}</Tag>
