@@ -59,7 +59,7 @@ class SDKServer {
       });
       const { openId, appId, name, email } = payload as Record<string, unknown>;
 
-      if (typeof openId !== "string" || !openId || typeof appId !== "string" || !appId) {
+      if (typeof openId !== "string" || !openId) {
         return null;
       }
 

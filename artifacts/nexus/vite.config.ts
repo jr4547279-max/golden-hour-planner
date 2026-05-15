@@ -75,7 +75,8 @@ export default defineConfig({
       "/api": {
         target: `http://localhost:${API_PORT}`,
         changeOrigin: true,
-        // Forward credentials so Set-Cookie headers propagate back to the browser
+        // Forward x-forwarded-proto so the API server can detect HTTPS correctly
+        xfwd: true,
         configure: (proxy) => {
           proxy.on("error", (err) => {
             console.error("[vite proxy] error:", err.message);

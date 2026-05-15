@@ -23,8 +23,8 @@ export default function AuthPage() {
   const utils = trpc.useUtils();
 
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => {
-      utils.auth.me.invalidate();
+    onSuccess: (data) => {
+      utils.auth.me.setData(undefined, data.user as any);
       setLocation("/");
     },
     onError: (err) => {
@@ -33,8 +33,8 @@ export default function AuthPage() {
   });
 
   const signupMutation = trpc.auth.signup.useMutation({
-    onSuccess: () => {
-      utils.auth.me.invalidate();
+    onSuccess: (data) => {
+      utils.auth.me.setData(undefined, data.user as any);
       setLocation("/");
     },
     onError: (err) => {
