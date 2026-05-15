@@ -8,8 +8,6 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
-// Trust Replit's reverse proxy so req.protocol reflects HTTPS —
-// critical for Set-Cookie Secure + SameSite=None to work in production.
 app.set("trust proxy", 1);
 
 app.use(
@@ -26,8 +24,6 @@ app.use(
   })
 );
 
-// CORS: only allow requests from origins that are either localhost (dev) or
-// ending in known Replit domains. Credentials are needed for cookie auth.
 function isTrustedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
   if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
@@ -58,6 +54,10 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
+});
+
+app.get("/api/healthz", (_req, res) => {
+  res.json({ status: "ok" });
 });
 
 app.use(

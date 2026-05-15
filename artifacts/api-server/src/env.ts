@@ -1,5 +1,3 @@
-// JWT_SECRET is the primary secret for session tokens.
-// Fall back to SESSION_SECRET if JWT_SECRET is not explicitly set.
 const cookieSecret =
   process.env.JWT_SECRET || process.env.SESSION_SECRET || "";
 

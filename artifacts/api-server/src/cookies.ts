@@ -20,11 +20,8 @@ export function getSessionCookieOptions(req: Request): CookieOptions {
   return {
     httpOnly: true,
     path: "/",
-    // SameSite=None requires Secure; fall back to Lax for local/http
     sameSite: secure ? "none" : "lax",
     secure,
-    // Fix: always persist for a year — without maxAge cookies are session-only
-    // and vanish when the browser tab closes.
     maxAge: ONE_YEAR_MS,
   };
 }

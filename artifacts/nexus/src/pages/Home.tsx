@@ -1,7 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// Removed getLoginUrl import
 import { Loader2, Calendar, Users, MapPin } from "lucide-react";
 import { useLocation } from "wouter";
 
