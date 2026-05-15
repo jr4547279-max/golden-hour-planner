@@ -7,12 +7,14 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Preferences from "./pages/Preferences";
 import GoldenWindow from "./pages/GoldenWindow";
+import AuthPage from "./pages/AuthPage";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/login" component={AuthPage} />
       <Route path="/preferences" component={Preferences} />
       <Route path="/golden-window" component={GoldenWindow} />
       <Route path="/404" component={NotFound} />

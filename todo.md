@@ -16,7 +16,7 @@
 ## Phase 3: Google OAuth & Session Management
 - [x] Implement Google OAuth 2.0 callback handler
 - [x] Set up token storage and refresh logic
-- [x] Implement login/logout flows with Manus Auth
+- [x] Implement real email/password signup and login flows (Replaced Manus Auth)
 - [x] Add session management to context
 - [x] Write tests for auth flows
 
@@ -90,7 +90,7 @@
 
 ## Completed Features
 - ✅ Database schema with 5 tables (calendar_connections, availability_windows, user_preferences, groups, group_members)
-- ✅ Manus OAuth login/logout with session management
+- ✅ Real email/password signup/login with session management
 - ✅ Google Calendar OAuth callback handler
 - ✅ Google Calendar Free/Busy API integration library
 - ✅ Availability normalization engine with timezone support

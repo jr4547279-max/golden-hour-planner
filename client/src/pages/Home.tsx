@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLoginUrl } from "@/const";
+// Removed getLoginUrl import
 import { Loader2, Calendar, Users, MapPin } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -30,11 +30,9 @@ export default function Home() {
           </div>
 
           <div className="space-y-4">
-            <a href={getLoginUrl()}>
-              <Button size="lg" className="w-full">
-                Sign In with Manus
-              </Button>
-            </a>
+            <Button size="lg" className="w-full" onClick={() => setLocation("/login")}>
+              Sign In
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 gap-4 mt-8">
