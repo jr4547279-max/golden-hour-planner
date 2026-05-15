@@ -27,6 +27,12 @@ app.use(
 
 // Build an explicit allowlist of trusted origins at startup.
 // We include localhost for dev and the specific Replit dev/prod domains.
+const replitDomains: string[] = (process.env.REPLIT_DOMAINS ?? "")
+  .split(",")
+  .map((d) => d.trim())
+  .filter(Boolean)
+  .map((d) => `https://${d}`);
+
 const TRUSTED_ORIGINS = new Set<string>(
   [
     "http://localhost:3000",
@@ -36,16 +42,20 @@ const TRUSTED_ORIGINS = new Set<string>(
       ? `https://${process.env.REPLIT_DEV_DOMAIN}`
       : null,
     process.env.VITE_APP_URL ?? null,
+    ...replitDomains,
   ].filter(Boolean) as string[]
 );
 
-// Also allow localhost and any Replit preview/dev domain.
+// Also allow localhost and any Replit preview/dev/prod domain.
 function isTrustedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
   if (TRUSTED_ORIGINS.has(origin)) return true;
   if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
   if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true;
+  // Replit dev domains (*.replit.dev)
   if (/^https:\/\/[a-zA-Z0-9-]+(\.[\w-]+)*\.replit\.dev(:\d+)?$/.test(origin)) return true;
+  // Replit production domains (*.replit.app and legacy *.repl.co)
+  if (/^https:\/\/[a-zA-Z0-9-]+(\.[\w-]+)*\.replit\.app(:\d+)?$/.test(origin)) return true;
   if (/^https:\/\/[a-zA-Z0-9-]+(\.[\w-]+)*\.repl\.co(:\d+)?$/.test(origin)) return true;
   return false;
 }
